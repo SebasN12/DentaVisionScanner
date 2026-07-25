@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Generated outputs
+openCV/output/*
+!openCV/output/.gitkeep
+
+# Raw captured images (optional)
+openCV/data/images/*
+!openCV/data/images/.gitkeep
+
+# Calibration results (optional)
+openCV/data/calibration/*
+!openCV/data/calibration/.gitkeep
+
+# 3D files
+*.ply
+*.pcd
+*.obj
+*.stl
+*.off
+*.xyz
+
+# Meshes and textures
+*.mtl
+*.png
+*.jpg
+*.jpeg
