@@ -1,6 +1,6 @@
 ## Requirements
 
-- python 3.11+
+- Python 3.11–3.12 recommended
 
 ## Install dependencies
 
