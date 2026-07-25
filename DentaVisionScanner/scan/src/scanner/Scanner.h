@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../hardware/IScannerHardware.h"
+#include "../hardware/mock/IScannerHardware.h"
 
 
 class Scanner

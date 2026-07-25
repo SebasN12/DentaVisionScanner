@@ -1,25 +1,57 @@
 #include <iostream>
 
-#include "hardware/MockScannerHardware.h"
-#include "scanner/Scanner.h"
+#include "hardware/UDPClient.h"
+#include "hardware/GvcpClient.h"
 
 
 int main()
 {
-    std::cout << "[INFO] DentaVision Scanner starting...\n";
+
+    UDPClient udp(
+        "192.168.232.2",
+        3956,
+        58137
+    );
 
 
-    MockScannerHardware hardware;
+    if(!udp.open())
+    {
+        return -1;
+    }
 
 
-    Scanner scanner(&hardware);
+    GvcpClient gvcp(udp);
 
 
-    scanner.runCapture();
+
+    std::cout 
+        << "Sending READREG CCP...\n";
 
 
-    std::cout << "[INFO] Session finished\n";
+
+    gvcp.readRegister(0x00000A00);
+
 
 
     return 0;
 }
+
+// int main()
+// {
+//     std::cout << "[INFO] DentaVision Scanner starting...\n";
+
+
+//     MockScannerHardware hardware;
+
+
+//     Scanner scanner(&hardware);
+
+
+//     scanner.runCapture();
+
+
+//     std::cout << "[INFO] Session finished\n";
+
+
+//     return 0;
+// }

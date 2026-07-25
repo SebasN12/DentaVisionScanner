@@ -11,9 +11,22 @@ add_executable(
 
     src/main.cpp
 
-    src/hardware/MockScannerHardware.cpp
+    # Hardware
+    src/hardware/mock/MockScannerHardware.cpp
+    src/hardware/GvcpClient.cpp
 
+    # Network capture / UDP
+    src/hardware/UDPClient.cpp
     src/capture/CaptureSession.cpp
 
+    # Scanner
     src/scanner/Scanner.cpp
 )
+
+
+if(WIN32)
+    target_link_libraries(
+        DentaVisionScanner
+        ws2_32
+    )
+endif()
