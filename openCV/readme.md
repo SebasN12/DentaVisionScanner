@@ -10,3 +10,28 @@ pip install -r requirements.txt
 
 ## Structure
 
+```bash
+├── data/
+│   ├── calibration/
+│   ├── images/
+│   └── test_dataset/
+│
+├── src/
+│   ├── camera.py
+│   ├── features.py
+│   ├── frame.py
+│   ├── matching.py
+│   ├── pose.py
+│   ├── triangulation.py
+│   ├── pointcloud.py
+│   └── visualization.py
+│
+├── output/
+│   ├── debug/
+│   ├── meshes/
+│   ├── pointclouds/
+│   ├── poses/
+│   └── screenshots/
+│
+└── main.py
+```

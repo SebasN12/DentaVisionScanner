@@ -16,11 +16,11 @@ env/
 openCV/output/*
 !openCV/output/.gitkeep
 
-# Raw captured images (optional)
+# Raw captured images
 openCV/data/images/*
 !openCV/data/images/.gitkeep
 
-# Calibration results (optional)
+# Calibration results
 openCV/data/calibration/*
 !openCV/data/calibration/.gitkeep
 
@@ -32,8 +32,5 @@ openCV/data/calibration/*
 *.off
 *.xyz
 
-# Meshes and textures
+# Mesh metadata
 *.mtl
-*.png
-*.jpg
-*.jpeg
