@@ -18,3 +18,45 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
+
+# python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Reconstruction outputs
+openCV/output/
+!openCV/output/.gitkeep
+
+# Raw captures from the scanner
+openCV/data/images/
+!openCV/data/images/.gitkeep
+
+# Calibration files
+openCV/data/calibration/
+!openCV/data/calibration/.gitkeep
+
+# Generated 3D files
+*.ply
+*.pcd
+*.obj
+*.stl
+*.off
+*.xyz
+*.mtl
+
+# Generated NumPy files
+*.npy
+*.npz
+
+# Logs
+*.log

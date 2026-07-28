@@ -12,7 +12,7 @@ from pathlib import Path
 
 import cv2
 
-from src.frame import Frame
+from src.core.frame import Frame
 
 
 class Camera:

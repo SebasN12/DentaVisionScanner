@@ -11,27 +11,35 @@ pip install -r requirements.txt
 ## Structure
 
 ```bash
+openCV/
+│
 ├── data/
-│   ├── calibration/
-│   ├── images/
-│   └── test_dataset/
-│
-├── src/
-│   ├── camera.py
-│   ├── features.py
-│   ├── frame.py
-│   ├── matching.py
-│   ├── pose.py
-│   ├── triangulation.py
-│   ├── pointcloud.py
-│   └── visualization.py
-│
 ├── output/
-│   ├── debug/
-│   ├── meshes/
-│   ├── pointclouds/
-│   ├── poses/
-│   └── screenshots/
+├── main.py
 │
-└── main.py
+└── src/
+    │
+    ├── __init__.py
+    │
+    ├── core/
+    │   ├── __init__.py
+    │   ├── frame.py
+    │   ├── match_result.py
+    │   └── reconstruction.py
+    │
+    ├── pipeline/
+    │   ├── __init__.py
+    │   ├── camera.py
+    │   ├── features.py
+    │   ├── matching.py
+    │   ├── pose.py
+    │   ├── triangulation.py
+    │   └── pointcloud.py
+    │
+    ├── visualization/
+    │   ├── __init__.py
+    │   └── visualizer.py
+    │
+    └── utils/
+        └── __init__.py
 ```
