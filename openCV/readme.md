@@ -21,6 +21,10 @@ openCV/
     │
     ├── __init__.py
     │
+    ├── config/
+    │   ├── __init__.py
+    │   ├── settings.py
+    │
     ├── core/
     │   ├── __init__.py
     │   ├── frame.py
