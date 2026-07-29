@@ -12,7 +12,7 @@ class Visualizer:
     @staticmethod
     def draw_keypoints(
         frame: Frame,
-        output_directory: str,
+        output_directory: Path | str,
         rich_keypoints: bool = True,
         show: bool = SHOW_WINDOWS,
     ) -> Path:
@@ -57,6 +57,7 @@ class Visualizer:
     def draw_matches(
         result: MatchResult,
         output_directory: str,
+        use_inliers: bool = False,
         show: bool = SHOW_WINDOWS,
     ) -> Path:
 
@@ -65,13 +66,19 @@ class Visualizer:
             parents=True,
             exist_ok=True,
         )
+        matches = (
+            result.inlier_matches
+            if use_inliers
+            and result.inlier_matches is not None
+            else result.good_matches
+        )
 
         image = cv2.drawMatches(
             result.frame1.image,
             result.frame1.keypoints,
             result.frame2.image,
             result.frame2.keypoints,
-            result.good_matches,
+            matches,
             None,
             flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
         )

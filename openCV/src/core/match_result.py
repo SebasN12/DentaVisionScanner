@@ -26,3 +26,9 @@ class MatchResult:
     rotation: np.ndarray | None = None
 
     translation: np.ndarray | None = None
+
+    inlier_matches: list[cv2.DMatch] | None = None
+
+    ransac_mask: np.ndarray | None = None
+
+    pose_mask: np.ndarray | None = None

@@ -29,7 +29,7 @@ class Camera:
         "*.tiff",
     )
 
-    def __init__(self, image_directory: str):
+    def __init__(self, image_directory: Path | str):
         self.image_directory = Path(image_directory)
 
         if not self.image_directory.exists():

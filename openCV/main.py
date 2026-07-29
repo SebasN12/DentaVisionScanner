@@ -1,12 +1,21 @@
 from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
 from src.pipeline.matching import FeatureMatcher
+from src.pipeline.pose import PoseEstimator
 from src.visualization.visualizer import Visualizer
 
+from src.config.camera import CAMERA_MATRIX
+
+from src.config.paths import (
+    DATASET_PATH,
+    FEATURES_OUTPUT,
+    MATCHES_OUTPUT,
+    INLIERS_OUTPUT,
+)
 
 def load_frames():
 
-    camera = Camera("openCV/data/test_dataset")
+    camera = Camera(DATASET_PATH)
 
     frames = camera.load_frames()
 
@@ -43,7 +52,7 @@ def test_features():
 
         output = Visualizer.draw_keypoints(
             frame,
-            "openCV/output/features",
+            FEATURES_OUTPUT,
         )
 
         print(f"Saved: {output}")
@@ -71,18 +80,64 @@ def test_matching():
 
         output = Visualizer.draw_matches(
             result,
-            "openCV/output/matches",
+            MATCHES_OUTPUT,
         )
 
         print(f"Saved: {output}")
 
+def test_pose():
 
+    frames = load_frames()
+
+    detector = FeatureDetector()
+    detector.detect_sequence(frames)
+
+    matcher = FeatureMatcher()
+    results = matcher.match_sequence(frames)
+
+    estimator = PoseEstimator()
+
+    for result in results:
+
+        estimator.estimate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+        print(
+            f"{result.frame1.filename}"
+            f" -> "
+            f"{result.frame2.filename}"
+        )
+
+        print(
+            f"Good matches: "
+            f"{len(result.good_matches)}"
+        )
+
+        print(
+            f"RANSAC inliers: "
+            f"{result.ransac_mask.sum()}"
+        )
+
+        print(
+            f"Pose inliers: "
+            f"{len(result.inlier_matches)}"
+        )
+
+        print()
+
+        Visualizer.draw_matches(
+            result,
+            INLIERS_OUTPUT,
+            use_inliers=True,
+        )
 
 def main():
 
     # Change this depending on what you want to test
 
-    test_matching()
+    test_pose()
 
 
 
