@@ -2,6 +2,7 @@ from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
 from src.pipeline.matching import FeatureMatcher
 from src.pipeline.pose import PoseEstimator
+from src.pipeline.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 
 from src.config.camera import CAMERA_MATRIX
@@ -133,11 +134,52 @@ def test_pose():
             use_inliers=True,
         )
 
+def test_triangulation():
+
+    frames = load_frames()
+
+    detector = FeatureDetector()
+    detector.detect_sequence(frames)
+
+    matcher = FeatureMatcher()
+    results = matcher.match_sequence(frames)
+
+    estimator = PoseEstimator()
+
+    triangulator = Triangulator()
+
+    for result in results:
+
+        estimator.estimate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+        cloud = triangulator.triangulate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+        print(
+            f"{result.frame1.filename}"
+            f" -> "
+            f"{result.frame2.filename}"
+        )
+
+        print(
+            f"3D points: "
+            f"{len(cloud.points)}"
+        )
+
+        Visualizer.show_point_cloud(
+            cloud,
+        )
+
 def main():
 
     # Change this depending on what you want to test
 
-    test_pose()
+    test_triangulation()
 
 
 

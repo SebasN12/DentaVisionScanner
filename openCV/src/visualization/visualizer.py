@@ -1,11 +1,11 @@
 from pathlib import Path
 
 import cv2
-
+import open3d as o3d
 from src.config.settings import SHOW_WINDOWS
 from src.core.frame import Frame
 from src.core.match_result import MatchResult
-
+from src.core.point_cloud import PointCloud
 
 class Visualizer:
 
@@ -100,3 +100,28 @@ class Visualizer:
             cv2.destroyAllWindows()
 
         return output_path
+    
+    @staticmethod
+    def show_point_cloud(
+        point_cloud: PointCloud,
+    ) -> None:
+        """
+        Displays a 3D point cloud using Open3D.
+        """
+
+        cloud = o3d.geometry.PointCloud()
+
+        cloud.points = o3d.utility.Vector3dVector(
+            point_cloud.points
+        )
+
+        if point_cloud.colors is not None:
+
+            cloud.colors = o3d.utility.Vector3dVector(
+                point_cloud.colors
+            )
+
+        o3d.visualization.draw_geometries(
+            [cloud],
+            window_name="Point Cloud",
+        )
