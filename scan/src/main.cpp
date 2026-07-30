@@ -7,26 +7,132 @@
 
 #include <iostream>
 
-#include "hardware/GvspReceiver.h"
+#include "capture/GvspReceiver.h"
+
+// streaming images
+#include <iostream>
+#include <fstream>
+#include "capture/GvspAnalyzer.h"
+
+#include <vector>
+#include <filesystem>
+
+#include "capture/GvspReceiver.h"
 
 
 int main()
 {
 
-    GvspReceiver receiver(62467);
+    std::cout 
+        << "Working directory: "
+        << std::filesystem::current_path()
+        << std::endl;
+
+
+    uint16_t gvspPort = 62467;
+
+
+    GvspReceiver receiver(gvspPort);
 
 
     if(!receiver.open())
     {
+        std::cout
+            << "Could not open GVSP receiver\n";
+
         return -1;
     }
 
 
-    receiver.start();
 
+    std::ofstream file(
+        "capture.raw",
+        std::ios::binary);
+
+
+
+    if(!file.is_open())
+    {
+        std::cout
+            << "Could not create file\n";
+
+        return -1;
+    }
+
+
+
+    std::cout
+        << "Capturing packets...\n";
+
+
+
+    size_t totalBytes = 0;
+
+
+    for(int i=0;i<500;i++)
+    {
+
+        std::vector<uint8_t> packet;
+
+
+        if(receiver.receivePacket(packet))
+        {
+
+            file.write(
+                reinterpret_cast<char*>(packet.data()),
+                packet.size()
+            );
+
+
+            totalBytes += packet.size();
+
+
+
+            std::cout
+                << "Packet "
+                << i
+                << " size "
+                << packet.size()
+                << "\n";
+
+        }
+
+    }
+
+
+
+    file.close();
+
+    std::cout
+        << "Saved "
+        << totalBytes
+        << " bytes\n";
+
+
+    std::ifstream input(
+        "capture.raw",
+        std::ios::binary
+    );
+
+
+    std::vector<uint8_t> data(
+        std::istreambuf_iterator<char>(input),
+        {}
+    );
+
+
+    GvspAnalyzer analyzer;
+
+    analyzer.analyze(data);
 
     return 0;
+
 }
+
+
+// ------------------------
+// SENDING GVCP COMMANDS
+// ------------------------
 
 // int main()
 // {
@@ -53,6 +159,11 @@ int main()
 //     sequence.execute();
 //     return 0;
 // }
+
+
+// ------------------------
+// Mock scanning hardware
+// ------------------------
 
 // int main()
 // {

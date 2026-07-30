@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <vector>
+#include <string>
 
 
 class GvspReceiver
@@ -20,7 +20,13 @@ public:
     void close();
 
 
-    void start();
+    bool receiveFrame(
+        std::vector<uint8_t>& image
+    );
+
+    bool receivePacket(
+        std::vector<uint8_t>& packet
+    );
 
 
 private:
@@ -29,30 +35,20 @@ private:
 
 
 #ifdef _WIN32
-
     uintptr_t m_socket;
-
 #else
-
     int m_socket;
-
 #endif
 
 
-    void processPacket(
-        const std::vector<uint8_t>& packet,
-        const std::string& senderIp,
-        uint16_t senderPort
-    );
-
-
-    void printHex(
-        const std::vector<uint8_t>& data
-    );
-
-
-    void analyzeGVSP(
+    uint32_t getBlockId(
         const std::vector<uint8_t>& packet
     );
+
+
+    uint32_t getPacketId(
+        const std::vector<uint8_t>& packet
+    );
+
 
 };
