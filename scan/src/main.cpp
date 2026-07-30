@@ -12,8 +12,6 @@
 // streaming images
 #include <iostream>
 #include <fstream>
-#include "capture/GvspAnalyzer.h"
-
 #include <vector>
 #include <filesystem>
 
@@ -23,16 +21,23 @@
 int main()
 {
 
-    std::cout 
+    std::cout
         << "Working directory: "
         << std::filesystem::current_path()
         << std::endl;
 
 
+
+    /*
+        GVSP port. Change manually if Sirona uses another.
+    */
+
     uint16_t gvspPort = 62467;
 
 
+
     GvspReceiver receiver(gvspPort);
+
 
 
     if(!receiver.open())
@@ -45,88 +50,74 @@ int main()
 
 
 
-    std::ofstream file(
-        "capture.raw",
-        std::ios::binary);
+    std::cout
+        << "Waiting for frame...\n";
 
 
 
-    if(!file.is_open())
+    std::vector<uint8_t> image;
+
+
+
+    if(!receiver.receiveFrame(image))
     {
         std::cout
-            << "Could not create file\n";
+            << "Could not receive frame\n";
 
         return -1;
     }
 
 
 
-    std::cout
-        << "Capturing packets...\n";
 
-
-
-    size_t totalBytes = 0;
-
-
-    for(int i=0;i<500;i++)
-    {
-
-        std::vector<uint8_t> packet;
-
-
-        if(receiver.receivePacket(packet))
-        {
-
-            file.write(
-                reinterpret_cast<char*>(packet.data()),
-                packet.size()
-            );
-
-
-            totalBytes += packet.size();
-
-
-
-            std::cout
-                << "Packet "
-                << i
-                << " size "
-                << packet.size()
-                << "\n";
-
-        }
-
-    }
-
-
-
-    file.close();
 
     std::cout
-        << "Saved "
-        << totalBytes
+        << "Frame received\n"
+        << "Size: "
+        << image.size()
         << " bytes\n";
 
 
-    std::ifstream input(
-        "capture.raw",
+
+
+
+    std::ofstream file(
+        "frame.raw",
         std::ios::binary
     );
 
 
-    std::vector<uint8_t> data(
-        std::istreambuf_iterator<char>(input),
-        {}
+
+    if(!file.is_open())
+    {
+        std::cout
+            << "Could not create frame.raw\n";
+
+        return -1;
+    }
+
+
+
+    file.write(
+        reinterpret_cast<char*>(image.data()),
+        image.size()
     );
 
 
-    GvspAnalyzer analyzer;
+    file.close();
 
-    analyzer.analyze(data);
+
+
+    std::cout
+        << "Saved frame.raw\n";
+
+
+
+    receiver.close();
+
+
 
     return 0;
-
 }
 
 

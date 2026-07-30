@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <string>
 
 
 class GvspReceiver
@@ -24,10 +23,6 @@ public:
         std::vector<uint8_t>& image
     );
 
-    bool receivePacket(
-        std::vector<uint8_t>& packet
-    );
-
 
 private:
 
@@ -41,12 +36,22 @@ private:
 #endif
 
 
+    bool receivePacket(
+        std::vector<uint8_t>& packet
+    );
+
+
     uint32_t getBlockId(
         const std::vector<uint8_t>& packet
     );
 
 
     uint32_t getPacketId(
+        const std::vector<uint8_t>& packet
+    );
+
+
+    uint16_t getPacketType(
         const std::vector<uint8_t>& packet
     );
 

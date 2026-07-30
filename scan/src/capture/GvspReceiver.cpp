@@ -2,8 +2,11 @@
 
 #include <iostream>
 
+#include <fstream>
 
 #ifdef _WIN32
+
+#define NOMINMAX
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -28,6 +31,8 @@ GvspReceiver::~GvspReceiver()
 {
     close();
 }
+
+
 
 
 
@@ -67,24 +72,20 @@ bool GvspReceiver::open()
     sockaddr_in addr{};
 
 
-    addr.sin_family =
-        AF_INET;
+    addr.sin_family = AF_INET;
 
+    addr.sin_addr.s_addr = INADDR_ANY;
 
-    addr.sin_addr.s_addr =
-        INADDR_ANY;
-
-
-    addr.sin_port =
-        htons(m_port);
+    addr.sin_port = htons(m_port);
 
 
 
     if(bind(
         m_socket,
         (sockaddr*)&addr,
-        sizeof(addr))<0)
+        sizeof(addr)) < 0)
     {
+
         std::cout
             <<"Bind failed\n";
 
@@ -94,7 +95,7 @@ bool GvspReceiver::open()
 
 
     std::cout
-        <<"GVSP listening on port "
+        <<"GVSP listening on "
         <<m_port
         <<"\n";
 
@@ -114,10 +115,13 @@ bool GvspReceiver::open()
 
 
 
+
+
 void GvspReceiver::close()
 {
 
 #ifdef _WIN32
+
 
     if(m_socket)
     {
@@ -128,9 +132,13 @@ void GvspReceiver::close()
 
     WSACleanup();
 
+
 #endif
 
 }
+
+
+
 
 
 
@@ -149,7 +157,7 @@ bool GvspReceiver::receivePacket(
     sockaddr_in sender{};
 
 
-    int size =
+    int senderSize =
         sizeof(sender);
 
 
@@ -161,22 +169,20 @@ bool GvspReceiver::receivePacket(
             packet.size(),
             0,
             (sockaddr*)&sender,
-            &size);
+            &senderSize);
 
 
 
     if(received<=0)
-    {
         return false;
-    }
 
 
 
     packet.resize(received);
 
 
-
     return true;
+
 
 
 #else
@@ -190,23 +196,20 @@ bool GvspReceiver::receivePacket(
 
 
 
-
-
-
 uint32_t GvspReceiver::getBlockId(
     const std::vector<uint8_t>& packet)
 {
-
-    if(packet.size()<8)
+    if(packet.size() < 6)
         return 0;
 
 
     return
-        (packet[2]<<8)
-        |
+        ((uint32_t)packet[2] << 8) |
         packet[3];
-
 }
+
+
+
 
 
 
@@ -216,21 +219,40 @@ uint32_t GvspReceiver::getBlockId(
 uint32_t GvspReceiver::getPacketId(
     const std::vector<uint8_t>& packet)
 {
-
     if(packet.size()<8)
         return 0;
 
 
     return
-        (packet[4]<<24)
-        |
-        (packet[5]<<16)
-        |
-        (packet[6]<<8)
-        |
-        packet[7];
+        ((uint32_t)packet[6] << 16) |
+        ((uint32_t)packet[7] << 8) |
+        ((uint32_t)packet[8]);
 
 }
+
+
+
+
+
+
+
+
+uint16_t GvspReceiver::getPacketType(
+    const std::vector<uint8_t>& packet)
+{
+
+    if(packet.size()<2)
+        return 0;
+
+
+    return
+        ((uint16_t)packet[0]<<8)
+        |
+        packet[1];
+
+}
+
+
 
 
 
@@ -246,17 +268,17 @@ bool GvspReceiver::receiveFrame(
     image.clear();
 
 
-    uint32_t currentBlock=0;
-
+    uint32_t currentBlock = 0;
 
 
     std::cout
-        <<"Waiting frame...\n";
+        <<"Waiting GVSP frame...\n";
 
 
 
     while(true)
     {
+
 
         std::vector<uint8_t> packet;
 
@@ -264,15 +286,74 @@ bool GvspReceiver::receiveFrame(
         if(!receivePacket(packet))
             continue;
 
+        std::cout << "\nFirst 64 bytes:\n";
 
+        size_t bytesToPrint = packet.size();
+
+        if(bytesToPrint > 64)
+        {
+            bytesToPrint = 64;
+        }
+
+        for(size_t i = 0; i < bytesToPrint; i++)
+        {
+            if(i % 16 == 0)
+            {
+                printf("%04zX: ", i);
+            }
+
+            printf("%02X ", packet[i]);
+
+            if((i + 1) % 16 == 0)
+            {
+                printf("\n");
+            }
+        }
+
+        if(bytesToPrint % 16 != 0)
+        {
+            printf("\n");
+        }
+
+        std::cout
+            << "Packet size: "
+            << packet.size()
+            << "\n";
+
+        printf("Header bytes: ");
+
+        for(size_t i = 0; i < 12 && i < packet.size(); i++)
+        {
+            printf("%02X ", packet[i]);
+        }
+
+        printf("\n");
 
         uint32_t block =
             getBlockId(packet);
 
-
-
         uint32_t packetId =
             getPacketId(packet);
+
+
+        // if(!receivePacket(packet))
+        //     continue;
+
+
+
+        // uint32_t block =
+        //     getBlockId(packet);
+
+
+
+        // uint32_t packetId =
+        //     getPacketId(packet);
+
+
+
+        uint16_t type =
+            getPacketType(packet);
+
 
 
 
@@ -281,43 +362,67 @@ bool GvspReceiver::receiveFrame(
             <<block
             <<" Packet: "
             <<packetId
+            <<" Type: 0x"
+            <<std::hex
+            <<type
+            <<std::dec
             <<" Size: "
             <<packet.size()
             <<"\n";
 
 
 
+
+
         if(currentBlock==0)
         {
-            currentBlock=block;
+            currentBlock = block;
         }
 
-
-
-        if(block!=currentBlock)
+        if(block != currentBlock)
         {
-
             std::cout
-            <<"New frame detected\n";
-
+                <<"New frame detected\n";
 
             break;
         }
 
 
-
-        /*
-            GVSP header:
-            
-            bytes 0-7
-            
-            payload starts at 8
-        */
-
-
-        for(size_t i=8;i<packet.size();i++)
+        // Leader packet
+        if(packet[4] == 0x01)
         {
-            image.push_back(packet[i]);
+            std::cout
+                <<"Ignoring leader packet\n";
+
+            continue;
+        }
+
+
+        // Trailer packet
+        if(packet[4] == 0x02)
+        {
+            std::cout
+                <<"Trailer received\n";
+
+            break;
+        }
+
+
+        // Data packets
+        if(packet[4] == 0x03)
+        {
+
+            for(size_t i=8;i<packet.size();i++)
+            {
+                image.push_back(packet[i]);
+            }
+
+            if(image.size() > 400000)
+                {
+                    std::cout<<"Enough data\n";
+                    break;
+                }
+
         }
 
 
@@ -325,10 +430,31 @@ bool GvspReceiver::receiveFrame(
 
 
 
+
+
     std::cout
-        <<"Frame size: "
+        <<"Frame bytes: "
         <<image.size()
-        <<" bytes\n";
+        <<"\n";
+
+
+    std::ofstream file(
+        "frame.raw",
+        std::ios::binary
+    );
+
+
+    file.write(
+        (char*)image.data(),
+        image.size()
+    );
+
+
+    file.close();
+
+
+    std::cout
+        <<"Saved frame.raw\n";
 
 
     return !image.empty();
