@@ -14,6 +14,8 @@ add_executable(
     # Hardware
     src/hardware/mock/MockScannerHardware.cpp
     src/hardware/GvcpClient.cpp
+    src/hardware/GvcpSequence.cpp
+    src/hardware/GvspReceiver.cpp
 
     # Network capture / UDP
     src/hardware/UDPClient.cpp
