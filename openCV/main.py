@@ -192,6 +192,23 @@ def test_reconstruction():
         frames
     )
 
+    print("\nMatching statistics:")
+
+    for result in results:
+
+        print(
+            f"{result.frame1.filename} "
+            f"<-> "
+            f"{result.frame2.filename}"
+        )
+
+        print(
+            f"  Good matches: "
+            f"{len(result.good_matches)}"
+        )
+
+    print()
+
     estimator = PoseEstimator()
 
     for result in results:
@@ -200,6 +217,24 @@ def test_reconstruction():
             result,
             CAMERA_MATRIX,
         )
+
+        print(
+            f"{result.frame1.filename} "
+            f"-> "
+            f"{result.frame2.filename}"
+        )
+
+        print(
+            f"  Matches: "
+            f"{len(result.good_matches)}"
+        )
+
+        print(
+            f"  Pose inliers: "
+            f"{len(result.inlier_matches)}"
+        )
+
+    print()
 
     triangulator = Triangulator()
 
@@ -217,7 +252,11 @@ def test_reconstruction():
     )
 
     print(
-        f"Camera poses: "
+        "Reconstruction statistics:"
+    )
+
+    print(
+        f"  Camera poses: "
         f"{len(reconstruction.camera_poses)}"
     )
 
