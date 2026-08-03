@@ -43,6 +43,15 @@ class Reconstruction:
         """
 
         return self.camera_poses.get(frame_name)
+    
+    def get_camera_poses(
+        self,
+    ) -> dict[str, CameraPose]:
+        """
+        Returns all estimated camera poses.
+        """
+
+        return self.camera_poses
 
     def set_point_cloud(
         self,

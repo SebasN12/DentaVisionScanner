@@ -1,5 +1,5 @@
 """
-Builds a global sparse reconstruction from multiple frames.
+Builds a global sparse reconstruction incrementally.
 """
 
 import numpy as np
@@ -14,17 +14,159 @@ from src.pipeline.triangulation import Triangulator
 
 class Reconstructor:
     """
-    Builds a global sparse 3D reconstruction.
+    Incrementally builds a global sparse 3D reconstruction.
 
-    This class combines relative camera poses and local
-    triangulated point clouds into a single global model.
+    Each new frame pair updates the global model.
     """
+
 
     def __init__(
         self,
         triangulator: Triangulator,
     ):
+
         self.triangulator = triangulator
+
+        self.reconstruction = Reconstruction()
+
+        self.current_pose = CameraPose.identity()
+
+        self.initialized = False
+
+        #
+        # Internal accumulated reconstruction data
+        #
+        self.global_points = []
+
+        self.global_colors = []
+
+
+
+    def update_pair(
+        self,
+        result: MatchResult,
+        camera_matrix: np.ndarray,
+    ) -> None:
+        """
+        Adds one new frame pair to the reconstruction.
+
+        Parameters
+        ----------
+        result
+            Matching and pose estimation result.
+
+        camera_matrix
+            Camera intrinsic matrix.
+        """
+
+
+        if (
+            result.rotation is None
+            or result.translation is None
+        ):
+            raise RuntimeError(
+                "Camera pose has not been estimated."
+            )
+
+
+        #
+        # Initialize first camera
+        #
+        if not self.initialized:
+
+            self.reconstruction.add_camera_pose(
+                result.frame1.filename,
+                self.current_pose,
+            )
+
+            self.initialized = True
+
+
+
+        #
+        # Relative movement between cameras
+        #
+        relative_pose = CameraPose(
+            rotation=result.rotation,
+            translation=result.translation,
+        )
+
+
+
+        #
+        # Compute new global camera pose
+        #
+        self.current_pose = self.compose_pose(
+            self.current_pose,
+            relative_pose,
+        )
+
+
+
+        self.reconstruction.add_camera_pose(
+            result.frame2.filename,
+            self.current_pose,
+        )
+
+
+
+        #
+        # Triangulate local points
+        #
+        cloud = self.triangulator.triangulate(
+            result,
+            camera_matrix,
+        )
+
+
+
+        #
+        # Transform points into global coordinates
+        #
+        points = self.transform_points(
+            cloud.points,
+            self.current_pose,
+        )
+
+
+
+        #
+        # Accumulate global point cloud
+        #
+        self.global_points.append(
+            points
+        )
+
+
+        if cloud.colors is not None:
+
+            self.global_colors.append(
+                cloud.colors
+            )
+
+
+
+        #
+        # Update stored reconstruction
+        #
+        colors = None
+
+        if len(self.global_colors) > 0:
+
+            colors = np.vstack(
+                self.global_colors
+            )
+
+
+        self.reconstruction.set_point_cloud(
+            PointCloud(
+                points=np.vstack(
+                    self.global_points
+                ),
+                colors=colors,
+            )
+        )
+
 
 
     def reconstruct(
@@ -33,127 +175,40 @@ class Reconstructor:
         camera_matrix: np.ndarray,
     ) -> Reconstruction:
         """
-        Creates a global reconstruction.
+        Reconstructs a complete sequence.
 
-        Parameters
-        ----------
-        results
-            List of MatchResult objects between consecutive frames.
-
-        camera_matrix
-            Camera intrinsic matrix.
-
-        Returns
-        -------
-        Reconstruction
-            Global sparse reconstruction.
+        This is a batch wrapper around update_pair().
         """
-
-        reconstruction = Reconstruction()
 
 
         if len(results) == 0:
+
             raise ValueError(
                 "No match results provided."
             )
 
 
-        #
-        # First camera defines the world coordinate system
-        #
-        first_frame = results[0].frame1
-
-        current_pose = CameraPose.identity()
-
-        reconstruction.add_camera_pose(
-            first_frame.filename,
-            current_pose,
-        )
-
-
-        global_points = []
-        global_colors = []
-
-
         for result in results:
 
-
-            #
-            # Estimate pose of next camera
-            #
-            relative_pose = CameraPose(
-                rotation=result.rotation,
-                translation=result.translation,
-            )
-
-
-            current_pose = self.compose_pose(
-                current_pose,
-                relative_pose,
-            )
-
-
-            reconstruction.add_camera_pose(
-                result.frame2.filename,
-                current_pose,
-            )
-
-
-            #
-            # Triangulate local points
-            #
-            cloud = self.triangulator.triangulate(
+            self.update_pair(
                 result,
                 camera_matrix,
             )
 
 
-            #
-            # Transform points from camera coordinates
-            # into world coordinates
-            #
-            points = self.transform_points(
-                cloud.points,
-                current_pose,
-            )
+        return self.reconstruction
 
 
-            global_points.append(points)
 
+    def get_reconstruction(
+        self,
+    ) -> Reconstruction:
+        """
+        Returns the current global reconstruction.
+        """
 
-            if cloud.colors is not None:
+        return self.reconstruction
 
-                global_colors.append(
-                    cloud.colors
-                )
-
-
-        #
-        # Merge all point clouds
-        #
-        if len(global_points) > 0:
-
-            points = np.vstack(
-                global_points
-            )
-
-            colors = None
-
-            if len(global_colors) > 0:
-
-                colors = np.vstack(
-                    global_colors
-                )
-
-            reconstruction.set_point_cloud(
-                PointCloud(
-                    points=points,
-                    colors=colors,
-                )
-            )
-
-
-        return reconstruction
 
 
     @staticmethod
@@ -164,11 +219,10 @@ class Reconstructor:
         """
         Composes two camera poses.
 
-        Computes:
-
         T_global_new =
             T_global_current * T_relative
         """
+
 
         rotation = (
             global_pose.rotation
@@ -190,15 +244,17 @@ class Reconstructor:
         )
 
 
+
     @staticmethod
     def transform_points(
         points: np.ndarray,
         pose: CameraPose,
     ) -> np.ndarray:
         """
-        Transforms points from local camera coordinates
+        Transforms points from camera coordinates
         into global coordinates.
         """
+
 
         transformed = (
             pose.rotation
