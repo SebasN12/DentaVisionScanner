@@ -1,3 +1,4 @@
+from src.pipeline.reconstructor import Reconstructor
 from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
 from src.pipeline.matching import FeatureMatcher
@@ -175,11 +176,75 @@ def test_triangulation():
             cloud,
         )
 
+def test_reconstruction():
+
+    frames = load_frames()
+
+    detector = FeatureDetector()
+
+    detector.detect_sequence(
+        frames
+    )
+
+    matcher = FeatureMatcher()
+
+    results = matcher.match_sequence(
+        frames
+    )
+
+    estimator = PoseEstimator()
+
+    for result in results:
+
+        estimator.estimate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+    triangulator = Triangulator()
+
+    reconstructor = Reconstructor(
+        triangulator
+    )
+
+    reconstruction = reconstructor.reconstruct(
+        results,
+        CAMERA_MATRIX,
+    )
+
+    print(
+        "\nReconstruction finished."
+    )
+
+    print(
+        f"Camera poses: "
+        f"{len(reconstruction.camera_poses)}"
+    )
+
+
+    if reconstruction.point_cloud is not None:
+
+        print(
+            f"3D points: "
+            f"{len(reconstruction.point_cloud.points)}"
+        )
+
+        Visualizer.show_point_cloud(
+            reconstruction.point_cloud
+        )
+
+    else:
+
+        print(
+            "No point cloud generated."
+        )
+
+
 def main():
 
     # Change this depending on what you want to test
 
-    test_triangulation()
+    test_reconstruction()
 
 
 
