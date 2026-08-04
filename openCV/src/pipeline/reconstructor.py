@@ -10,35 +10,47 @@ from src.core.point_cloud import PointCloud
 from src.core.match_result import MatchResult
 
 from src.pipeline.triangulation import Triangulator
+from src.pipeline.track_builder import TrackBuilder
+from src.pipeline.landmark_manager import LandmarkManager
+
 
 
 class Reconstructor:
     """
     Incrementally builds a global sparse 3D reconstruction.
 
-    Each new frame pair updates the global model.
+    Images are processed sequentially.
     """
+
 
 
     def __init__(
         self,
         triangulator: Triangulator,
+        track_builder: TrackBuilder,
+        landmark_manager: LandmarkManager,
     ):
 
         self.triangulator = triangulator
 
+        self.track_builder = track_builder
+
+        self.landmark_manager = landmark_manager
+
+
         self.reconstruction = Reconstruction()
+
 
         self.current_pose = CameraPose.identity()
 
+
         self.initialized = False
 
-        #
-        # Internal accumulated reconstruction data
-        #
-        self.global_points = []
 
-        self.global_colors = []
+        #
+        # Frames known by reconstruction
+        #
+        self.frames = {}
 
 
 
@@ -48,15 +60,7 @@ class Reconstructor:
         camera_matrix: np.ndarray,
     ) -> None:
         """
-        Adds one new frame pair to the reconstruction.
-
-        Parameters
-        ----------
-        result
-            Matching and pose estimation result.
-
-        camera_matrix
-            Camera intrinsic matrix.
+        Integrates one new consecutive image pair.
         """
 
 
@@ -67,6 +71,36 @@ class Reconstructor:
             raise RuntimeError(
                 "Camera pose has not been estimated."
             )
+
+
+
+        #
+        # Store frames
+        #
+        self.frames[
+            result.frame1.filename
+        ] = result.frame1
+
+
+        self.frames[
+            result.frame2.filename
+        ] = result.frame2
+
+
+
+        #
+        # Add feature correspondences
+        #
+        self.track_builder.add_matches(
+            result
+        )
+
+
+        #
+        # Update tracks after new unions
+        #
+        self.track_builder.update_tracks()
+
 
 
         #
@@ -84,7 +118,7 @@ class Reconstructor:
 
 
         #
-        # Relative movement between cameras
+        # Compute new global camera pose
         #
         relative_pose = CameraPose(
             rotation=result.rotation,
@@ -92,15 +126,10 @@ class Reconstructor:
         )
 
 
-
-        #
-        # Compute new global camera pose
-        #
         self.current_pose = self.compose_pose(
             self.current_pose,
             relative_pose,
         )
-
 
 
         self.reconstruction.add_camera_pose(
@@ -111,7 +140,7 @@ class Reconstructor:
 
 
         #
-        # Triangulate local points
+        # Triangulate current pair
         #
         cloud = self.triangulator.triangulate(
             result,
@@ -120,9 +149,6 @@ class Reconstructor:
 
 
 
-        #
-        # Transform points into global coordinates
-        #
         points = self.transform_points(
             cloud.points,
             self.current_pose,
@@ -131,39 +157,137 @@ class Reconstructor:
 
 
         #
-        # Accumulate global point cloud
+        # Associate triangulated points
+        # with their corresponding tracks
         #
-        self.global_points.append(
-            points
+        if result.inlier_matches is not None:
+
+            for index, match in enumerate(
+                result.inlier_matches
+            ):
+
+                if index >= len(points):
+                    break
+
+
+                observation = (
+                    result.frame1.filename,
+                    match.queryIdx,
+                )
+
+
+                track_id = (
+                    self.track_builder.get_track_id(
+                        observation[0],
+                        observation[1],
+                    )
+                )
+
+
+                if track_id is None:
+                    continue
+
+
+
+                track = (
+                    self.track_builder.get_track(
+                        track_id
+                    )
+                )
+
+
+                if track is None:
+                    continue
+
+
+
+                #
+                # Create landmark only once
+                #
+                landmark = self.landmark_manager.get_or_create_from_track(
+                    track,
+                    points[index],
+                    self.frames,
+                    (
+                        cloud.colors[index]
+                        if cloud.colors is not None
+                        else None
+                    ),
+                )
+
+
+                if (
+                    landmark.id
+                    not in self.reconstruction.landmarks
+                ):
+
+                    self.reconstruction.add_landmark(
+                        landmark
+                    )
+
+
+
+        #
+        # Update point cloud
+        #
+        self.update_point_cloud()
+
+
+
+    def update_point_cloud(
+        self,
+    ) -> None:
+        """
+        Updates point cloud from landmarks.
+        """
+
+
+        landmarks = (
+            self.reconstruction.landmarks.values()
         )
 
 
-        if cloud.colors is not None:
+        points = []
 
-            self.global_colors.append(
-                cloud.colors
+        colors = []
+
+
+        for landmark in landmarks:
+
+            points.append(
+                landmark.position
             )
 
 
+            if landmark.color is not None:
 
-        #
-        # Update stored reconstruction
-        #
-        colors = None
+                colors.append(
+                    landmark.color
+                )
 
-        if len(self.global_colors) > 0:
 
-            colors = np.vstack(
-                self.global_colors
+
+        if len(points) == 0:
+
+            return
+
+
+
+        color_array = None
+
+
+        if len(colors) == len(points):
+
+            color_array = np.asarray(
+                colors
             )
+
 
 
         self.reconstruction.set_point_cloud(
             PointCloud(
-                points=np.vstack(
-                    self.global_points
-                ),
-                colors=colors,
+                points=np.asarray(points),
+                colors=color_array,
             )
         )
 
@@ -175,17 +299,8 @@ class Reconstructor:
         camera_matrix: np.ndarray,
     ) -> Reconstruction:
         """
-        Reconstructs a complete sequence.
-
-        This is a batch wrapper around update_pair().
+        Offline wrapper using sequential reconstruction.
         """
-
-
-        if len(results) == 0:
-
-            raise ValueError(
-                "No match results provided."
-            )
 
 
         for result in results:
@@ -203,9 +318,6 @@ class Reconstructor:
     def get_reconstruction(
         self,
     ) -> Reconstruction:
-        """
-        Returns the current global reconstruction.
-        """
 
         return self.reconstruction
 
@@ -216,12 +328,6 @@ class Reconstructor:
         global_pose: CameraPose,
         relative_pose: CameraPose,
     ) -> CameraPose:
-        """
-        Composes two camera poses.
-
-        T_global_new =
-            T_global_current * T_relative
-        """
 
 
         rotation = (
@@ -250,10 +356,6 @@ class Reconstructor:
         points: np.ndarray,
         pose: CameraPose,
     ) -> np.ndarray:
-        """
-        Transforms points from camera coordinates
-        into global coordinates.
-        """
 
 
         transformed = (
@@ -263,7 +365,7 @@ class Reconstructor:
 
 
         transformed += (
-            pose.translation.reshape(1, 3)
+            pose.translation.reshape(1,3)
         )
 
 

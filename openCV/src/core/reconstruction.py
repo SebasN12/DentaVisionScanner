@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from src.core.camera_pose import CameraPose
 from src.core.point_cloud import PointCloud
+from src.core.landmark import Landmark
 
 
 @dataclass
@@ -23,6 +24,10 @@ class Reconstruction:
 
     point_cloud: PointCloud | None = None
 
+    landmarks: dict[int, Landmark] = field(
+        default_factory=dict
+    )
+
     def add_camera_pose(
         self,
         frame_name: str,
@@ -33,6 +38,18 @@ class Reconstruction:
         """
 
         self.camera_poses[frame_name] = pose
+
+    def add_landmark(
+        self,
+        landmark: Landmark,
+    ) -> None:
+        """
+        Stores a reconstructed 3D landmark.
+        """
+
+        self.landmarks[
+            landmark.id
+        ] = landmark
 
     def get_camera_pose(
         self,
@@ -71,5 +88,7 @@ class Reconstruction:
         """
 
         self.camera_poses.clear()
+
+        self.landmarks.clear()
 
         self.point_cloud = None

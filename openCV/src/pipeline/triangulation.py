@@ -21,6 +21,7 @@ class Triangulator:
         self,
         result: MatchResult,
         camera_matrix: np.ndarray,
+        track_ids: list[int] | None = None,
     ) -> PointCloud:
 
         if (
@@ -88,6 +89,7 @@ class Triangulator:
         return PointCloud(
             points=points,
             colors=colors,
+            track_ids=track_ids,
         )
 
     def _extract_colors(
