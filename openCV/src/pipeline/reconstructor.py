@@ -208,6 +208,7 @@ class Reconstructor:
                     track,
                     points[index],
                     self.frames,
+                    self.reconstruction.camera_ids,
                     (
                         cloud.colors[index]
                         if cloud.colors is not None

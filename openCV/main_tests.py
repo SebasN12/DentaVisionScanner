@@ -681,7 +681,33 @@ def test_sequential_reconstruction_with_tracks():
         f"{len(reconstruction.landmarks)} landmarks"
     )
 
+    #
+    # Verify camera IDs
+    #
+    print(
+        f"Camera IDs: "
+        f"{len(reconstruction.camera_ids)}"
+    )
 
+    assert len(
+        reconstruction.camera_ids
+    ) == len(
+        reconstruction.camera_poses
+    )
+
+    #
+    # Verify observations contain camera IDs
+    #
+    for landmark in reconstruction.landmarks.values():
+
+        for observation in landmark.observations:
+
+            assert observation.camera_id in reconstruction.camera_ids.values()
+
+    print(
+        "All observations have valid camera IDs."
+    )
+    
 
     #
     # Write result

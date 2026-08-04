@@ -67,6 +67,7 @@ class LandmarkManager:
         track: Track,
         position: np.ndarray,
         frames: dict[str, Frame],
+        camera_ids: dict[str, int],
         color: np.ndarray | None = None,
     ) -> Landmark:
         """
@@ -88,6 +89,7 @@ class LandmarkManager:
             landmark,
             track,
             frames,
+            camera_ids,
         )
 
 
@@ -99,6 +101,7 @@ class LandmarkManager:
         landmark: Landmark,
         track: Track,
         frames: dict[str, Frame],
+        camera_ids: dict[str, int],
     ) -> None:
         """
         Adds only new observations.
@@ -141,6 +144,7 @@ class LandmarkManager:
 
             observation = Observation(
                 frame_name=frame_name,
+                camera_id=camera_ids[frame_name],
                 keypoint_index=keypoint_index,
                 image_point=np.asarray(
                     keypoint.pt
@@ -201,6 +205,7 @@ class LandmarkManager:
         track: Track,
         position: np.ndarray,
         frames: dict[str, Frame],
+        camera_ids: dict[str, int],
         color=None,
     ):
         """
@@ -222,6 +227,7 @@ class LandmarkManager:
                 landmark,
                 track,
                 frames,
+                camera_ids,
             )
 
 
@@ -233,6 +239,7 @@ class LandmarkManager:
             track,
             position,
             frames,
+            camera_ids,
             color,
         )
 

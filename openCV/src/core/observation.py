@@ -26,6 +26,8 @@ class Observation:
 
     frame_name: str
 
+    camera_id: int
+
     keypoint_index: int
 
     image_point: np.ndarray

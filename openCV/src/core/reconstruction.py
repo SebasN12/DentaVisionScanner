@@ -22,6 +22,10 @@ class Reconstruction:
         default_factory=dict
     )
 
+    camera_ids: dict[str, int] = field(
+        default_factory=dict
+    )
+
     point_cloud: PointCloud | None = None
 
     landmarks: dict[int, Landmark] = field(
@@ -33,9 +37,12 @@ class Reconstruction:
         frame_name: str,
         pose: CameraPose,
     ) -> None:
-        """
-        Stores the global pose of a camera.
-        """
+
+        if frame_name not in self.camera_ids:
+
+            self.camera_ids[frame_name] = len(
+                self.camera_ids
+            )
 
         self.camera_poses[frame_name] = pose
 
