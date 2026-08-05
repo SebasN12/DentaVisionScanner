@@ -246,8 +246,14 @@ def test_reconstruction():
 
     triangulator = Triangulator()
 
+    track_builder = TrackBuilder()
+
+    landmark_manager = LandmarkManager()
+
     reconstructor = Reconstructor(
-        triangulator
+        triangulator,
+        track_builder,
+        landmark_manager,
     )
 
     reconstruction = reconstructor.reconstruct(
@@ -300,8 +306,14 @@ def test_sequential_reconstruction():
 
     triangulator = Triangulator()
 
+    track_builder = TrackBuilder()
+
+    landmark_manager = LandmarkManager()
+
     reconstructor = Reconstructor(
-        triangulator
+        triangulator,
+        track_builder,
+        landmark_manager,
     )
 
 
