@@ -1,3 +1,8 @@
+from xml.parsers.expat import errors
+
+import cv2
+import numpy as np
+
 from src.pipeline.reconstructor import Reconstructor
 from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
@@ -9,6 +14,10 @@ from src.io.point_cloud_writer import PointCloudWriter
 from src.io.pose_writer import PoseWriter
 from src.pipeline.track_builder import TrackBuilder
 from src.pipeline.landmark_manager import LandmarkManager
+from src.optimization.bundle_adjustment import BundleAdjustment
+from src.core.reconstruction import Reconstruction
+from src.core.landmark import Landmark
+import tests.debug_reconstruction as debug
 
 from src.config.camera import CAMERA_MATRIX
 
@@ -732,4 +741,397 @@ def test_sequential_reconstruction_with_tracks():
 
     print(
         f"Saved: {output}"
+    )
+
+
+def test_bundle_adjustment():
+
+    reconstruction = build_reconstruction()
+
+
+    print_reconstruction_summary(
+        reconstruction
+    )
+
+
+    debug.debug_duplicate_tracks(
+        reconstruction
+    )
+
+
+    debug.debug_camera_poses(
+        reconstruction
+    )
+
+
+    debug.debug_landmarks(
+        reconstruction
+    )
+
+    debug.remove_bad_observations(
+        reconstruction,
+        CAMERA_MATRIX,
+        threshold=10,
+    )
+
+    errors_clean = compute_reprojection_errors(
+        reconstruction,
+        CAMERA_MATRIX,
+    )
+
+    print_error_statistics(
+        errors_clean,
+        "After filtering"
+    )
+
+
+    debug.debug_bad_observations(
+        reconstruction,
+        CAMERA_MATRIX,
+        threshold=10,
+    )
+
+    debug.remove_empty_landmarks(
+        reconstruction)
+    
+    debug.filter_short_tracks(reconstruction, minimum_observations=3)
+
+
+    ba = BundleAdjustment(
+        CAMERA_MATRIX
+    )
+
+
+    print()
+    print(
+        "Running Bundle Adjustment..."
+    )
+
+
+    ba.optimize(
+        reconstruction
+    )
+
+
+    errors_after = compute_reprojection_errors(
+        reconstruction,
+        CAMERA_MATRIX,
+    )
+
+
+    print_error_statistics(
+        errors_after,
+        "After BA"
+    )
+
+
+    _update_point_cloud_from_landmarks(
+        reconstruction
+    )
+
+
+    Visualizer.show_point_cloud(
+        reconstruction.point_cloud
+    )
+
+
+def build_reconstruction():
+
+    frames = load_frames()
+
+
+    detector = FeatureDetector()
+    matcher = FeatureMatcher()
+    estimator = PoseEstimator()
+    triangulator = Triangulator()
+    track_builder = TrackBuilder()
+    landmark_manager = LandmarkManager()
+
+
+    reconstructor = Reconstructor(
+        triangulator,
+        track_builder,
+        landmark_manager,
+    )
+
+
+    previous_frame = None
+
+
+    for frame in frames:
+
+        detector.detect(frame)
+
+
+        if previous_frame is None:
+
+            previous_frame = frame
+            continue
+
+
+        result = matcher.match(
+            previous_frame,
+            frame,
+        )
+
+
+        estimator.estimate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+
+        reconstructor.update_pair(
+            result,
+            CAMERA_MATRIX,
+        )
+
+
+        previous_frame = frame
+
+
+    return reconstructor.get_reconstruction()
+
+def print_reconstruction_summary(
+    reconstruction,
+):
+
+    print()
+    print("==========================")
+    print("RECONSTRUCTION SUMMARY")
+    print("==========================")
+
+
+    print(
+        "Cameras:",
+        len(reconstruction.camera_poses)
+    )
+
+
+    print(
+        "Landmarks:",
+        len(reconstruction.landmarks)
+    )
+
+    observations = [
+        len(lm.observations)
+        for lm in reconstruction.landmarks.values()
+    ]
+
+
+    print(
+        "Average observations per landmark:",
+        np.mean(observations)
+    )
+
+    print(
+        "Min observations:",
+        np.min(observations)
+    )
+
+    print(
+        "Max observations:",
+        np.max(observations)
+    )
+
+
+    print(
+        "Observations:",
+        sum(observations)
+    )
+
+
+    print("==========================")
+
+def compute_reprojection_errors(
+    reconstruction,
+    camera_matrix,
+):
+    """
+    Computes reprojection errors for all observations.
+
+    Returns:
+        np.ndarray containing one error per observation.
+    """
+
+    errors = []
+
+    frame_errors = {}
+
+
+    camera_lookup = {
+        camera_id: frame_name
+        for frame_name, camera_id
+        in reconstruction.camera_ids.items()
+    }
+
+
+    for landmark in reconstruction.landmarks.values():
+
+        point = landmark.position.reshape(
+            1,
+            3,
+        )
+
+
+        for observation in landmark.observations:
+
+
+            frame_name = camera_lookup.get(
+                observation.camera_id
+            )
+
+
+            if frame_name is None:
+                continue
+
+
+            pose = reconstruction.camera_poses[
+                frame_name
+            ]
+
+
+            R = pose.rotation
+            t = pose.translation
+
+
+            rvec, _ = cv2.Rodrigues(
+                R
+            )
+
+
+            projected, _ = cv2.projectPoints(
+                point,
+                rvec,
+                t,
+                camera_matrix,
+                None,
+            )
+
+
+            projected = projected.reshape(
+                2
+            )
+
+
+            error = np.linalg.norm(
+                projected
+                -
+                observation.image_point
+            )
+
+
+            errors.append(
+                error
+            )
+
+
+            frame_errors.setdefault(
+                frame_name,
+                []
+            ).append(
+                error
+            )
+
+
+    print()
+
+    print(
+        "=========================="
+    )
+
+    print(
+        "ERROR PER CAMERA"
+    )
+
+    print(
+        "=========================="
+    )
+
+
+    for frame_name in sorted(frame_errors):
+
+        values = np.asarray(
+            frame_errors[frame_name]
+        )
+
+
+        print(
+            f"{frame_name}: "
+            f"mean={values.mean():8.2f}px   "
+            f"median={np.median(values):8.2f}px   "
+            f"count={len(values)}"
+        )
+
+
+    print(
+        "=========================="
+    )
+
+
+    return np.asarray(
+        errors
+    )
+
+
+def print_error_statistics(
+    errors,
+    name,
+):
+    if len(errors) == 0:
+        print("No reprojection errors available")
+        return
+
+    print()
+    print("==========================")
+    print(name)
+    print("==========================")
+
+
+    print(
+        "Mean:",
+        np.mean(errors)
+    )
+
+    print(
+        "Median:",
+        np.median(errors)
+    )
+
+    print(
+        "95 percentile:",
+        np.percentile(errors,95)
+    )
+
+    print(
+        "Max:",
+        np.max(errors)
+    )
+
+    print("==========================")
+
+
+def _update_point_cloud_from_landmarks(
+    reconstruction,
+):
+    """
+    Updates point cloud positions after optimization.
+    """
+
+    if reconstruction.point_cloud is None:
+        return
+
+
+    points = []
+
+
+    for landmark in reconstruction.landmarks.values():
+
+        points.append(
+            landmark.position
+        )
+
+
+    reconstruction.point_cloud.points = np.asarray(
+        points
     )

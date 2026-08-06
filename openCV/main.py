@@ -1,4 +1,4 @@
-import main_tests as tests
+import tests.main_tests as tests
 
 def main():
 
@@ -16,9 +16,11 @@ def main():
 
     # tests.test_reconstruction()
 
-    tests.test_sequential_reconstruction()
+    # tests.test_sequential_reconstruction()
 
     # tests.test_sequential_reconstruction_with_tracks()
+
+    tests.test_sequential_reconstruction()
 
 
 
