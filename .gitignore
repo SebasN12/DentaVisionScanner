@@ -34,16 +34,16 @@ env/
 .idea/
 
 # Reconstruction outputs
-openCV/output/
-!openCV/output/.gitkeep
+reconstruction/output/
+!reconstruction/output/.gitkeep
 
 # Raw captures from the scanner
-openCV/data/images/
-!openCV/data/images/.gitkeep
+reconstruction/data/images/
+!reconstruction/data/images/.gitkeep
 
 # Calibration files
-openCV/data/calibration/
-!openCV/data/calibration/.gitkeep
+reconstruction/data/calibration/
+!reconstruction/data/calibration/.gitkeep
 
 # Generated 3D files
 *.ply
