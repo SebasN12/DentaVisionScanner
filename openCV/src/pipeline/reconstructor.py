@@ -149,10 +149,41 @@ class Reconstructor:
 
 
 
+        # points = self.transform_points(
+        #     cloud.points,
+        #     self.current_pose,
+        # )
+        # -> possible bug
+
+        frame1_pose = self.reconstruction.get_camera_pose(
+            result.frame1.filename
+        )
+
+        if frame1_pose is None:
+            raise RuntimeError(
+                "Frame 1 pose not found."
+            )
+
         points = self.transform_points(
             cloud.points,
-            self.current_pose,
+            frame1_pose,
         )
+
+        # debug
+        print("PAIR")
+        print(
+            result.frame1.filename,
+            "->",
+            result.frame2.filename
+        )
+
+        print("Frame1 pose:")
+        print(frame1_pose.rotation)
+        print(frame1_pose.translation.reshape(3))
+
+        print("World point:")
+        print(points[0])
+        # debug
 
 
 
@@ -204,6 +235,20 @@ class Reconstructor:
                 #
                 # Create landmark only once
                 #
+
+                # DEBUG
+                if index == 0:
+                    print()
+                    print("Pair:")
+                    print(result.frame1.filename, "->", result.frame2.filename)
+
+                    print("First triangulated point:")
+                    print(points[0])
+
+                    print("Frame1 global translation:")
+                    print(frame1_pose.translation.reshape(3))
+                # /DEBUG
+
                 landmark = self.landmark_manager.get_or_create_from_track(
                     track,
                     points[index],
@@ -329,19 +374,31 @@ class Reconstructor:
         global_pose: CameraPose,
         relative_pose: CameraPose,
     ) -> CameraPose:
+        """
+        Composes:
 
+            world -> current camera
+
+        with:
+
+            current camera -> next camera
+
+        resulting in:
+
+            world -> next camera
+        """
 
         rotation = (
-            global_pose.rotation
-            @ relative_pose.rotation
+            relative_pose.rotation
+            @ global_pose.rotation
         )
 
 
         translation = (
-            global_pose.rotation
-            @ relative_pose.translation
+            relative_pose.rotation
+            @ global_pose.translation
             +
-            global_pose.translation
+            relative_pose.translation
         )
 
 
@@ -357,17 +414,29 @@ class Reconstructor:
         points: np.ndarray,
         pose: CameraPose,
     ) -> np.ndarray:
+        """
+        Converts camera coordinates into world coordinates.
+
+        Camera pose stores:
+
+            X_camera = R * X_world + t
+
+        Therefore inverse is:
+
+            X_world = R.T * (X_camera - t)
+        """
+
+        points_centered = (
+            points
+            -
+            pose.translation.reshape(1, 3)
+        )
 
 
         transformed = (
-            pose.rotation
-            @ points.T
+            pose.rotation.T
+            @ points_centered.T
         ).T
-
-
-        transformed += (
-            pose.translation.reshape(1,3)
-        )
 
 
         return transformed

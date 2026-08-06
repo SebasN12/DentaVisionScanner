@@ -1,5 +1,11 @@
 """
-Stores the pose of a camera in the global coordinate system.
+Camera pose represents world-to-camera transformation.
+
+Transforms:
+
+X_camera = R * X_world + t
+
+Compatible with OpenCV projectPoints.
 """
 
 from dataclasses import dataclass
@@ -10,15 +16,23 @@ import numpy as np
 @dataclass
 class CameraPose:
     """
-    Represents the pose of a camera.
+    Represents a world-to-camera transformation.
+
+    The transformation is:
+
+        X_camera = R * X_world + t
+
+    This convention is compatible with:
+
+        cv2.projectPoints()
 
     Attributes
     ----------
     rotation
-        3x3 rotation matrix.
+        Rotation matrix R (world to camera).
 
     translation
-        3x1 translation vector.
+        Translation vector t (world to camera).
     """
 
     rotation: np.ndarray

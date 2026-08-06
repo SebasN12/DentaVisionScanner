@@ -10,7 +10,14 @@ from src.core.match_result import MatchResult
 
 class PoseEstimator:
     """
-    Estimates the relative camera pose between two frames.
+    Estimates relative camera motion between two frames.
+
+    Output convention:
+
+        X_frame2 =
+        R * X_frame1 + t
+
+    This is NOT a global camera pose.
     """
 
     def estimate(
