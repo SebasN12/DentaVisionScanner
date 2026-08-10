@@ -19,6 +19,10 @@ from src.core.reconstruction import Reconstruction
 from src.core.landmark import Landmark
 import tests.debug_reconstruction as debug
 
+
+from src_v2.reconstruction.openmvg import OpenMVG
+from src_v2.reconstruction.pipeline import ReconstructionPipeline
+
 from src.config.camera import CAMERA_MATRIX
 
 from src.config.paths import (
@@ -31,6 +35,7 @@ from src.config.paths import (
 )
 
 
+# Pipeline A: pairwise reconstruction with OpenCV
 
 def load_frames():
 
@@ -1135,3 +1140,22 @@ def _update_point_cloud_from_landmarks(
     reconstruction.point_cloud.points = np.asarray(
         points
     )
+
+# Pipeline B: OpenMVG reconstruction
+
+def test_openmvg_pipeline():
+    openmvg = OpenMVG()
+
+    pipeline = ReconstructionPipeline(
+        openmvg=openmvg,
+        clean_output=True,
+    )
+
+    point_cloud = pipeline.run()
+
+    print(f"\nPoint cloud generated at:")
+    print(point_cloud)
+
+    visualizer = Visualizer()
+
+    visualizer.show_ply(point_cloud)

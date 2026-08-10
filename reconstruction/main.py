@@ -1,8 +1,13 @@
 import tests.main_tests as tests
+from src.visualization.visualizer import Visualizer
+from pathlib import Path
+from src.config.paths import OUTPUT_PATH
 
 def main():
 
     # Change this depending on what you want to test
+
+    # Pipeline A: pairwise reconstruction with OpenCV
 
     # tests.test_camera()
 
@@ -20,7 +25,18 @@ def main():
 
     # tests.test_sequential_reconstruction_with_tracks()
 
-    tests.test_sequential_reconstruction()
+    # tests.test_sequential_reconstruction()
+
+
+    # Pipeline B: OpenMVG reconstruction
+
+    # visualizer = Visualizer()
+
+    # visualizer.show_ply(Path("C:\dev\openMVG_test\output\sfm\colored_cloud.ply"))
+
+    # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "point_cloud.ply")
+
+    tests.test_openmvg_pipeline()
 
 
 

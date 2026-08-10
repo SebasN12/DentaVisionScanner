@@ -4,3 +4,4 @@ open3d
 matplotlib
 scipy
 tqdm
+dotenv

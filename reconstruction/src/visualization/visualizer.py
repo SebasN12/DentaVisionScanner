@@ -7,6 +7,13 @@ from src.core.frame import Frame
 from src.core.match_result import MatchResult
 from src.core.point_cloud import PointCloud
 
+
+#temporary
+
+import numpy as np
+
+#/temporary
+
 class Visualizer:
 
     @staticmethod
@@ -124,4 +131,46 @@ class Visualizer:
         o3d.visualization.draw_geometries(
             [cloud],
             window_name="Point Cloud",
+        )
+    
+    @staticmethod
+    def show_ply(
+        ply_path: str | Path,
+    ) -> None:
+        """
+        Displays a PLY point cloud using Open3D.
+        """
+
+        ply_path = Path(ply_path)
+
+        if not ply_path.exists():
+            raise FileNotFoundError(
+                f"PLY file not found: {ply_path}"
+            )
+
+        cloud = o3d.io.read_point_cloud(
+            str(ply_path)
+        )
+
+        if cloud.is_empty():
+            raise ValueError(
+                f"PLY file contains no points: {ply_path}"
+            )
+        
+        colors = np.asarray(cloud.colors)
+
+        unique_colors, counts = np.unique(
+            colors,
+            axis=0,
+            return_counts=True
+        )
+
+        print("Number of different colors:", len(unique_colors))
+
+        for color, count in zip(unique_colors[:10], counts[:10]):
+            print(color, count)
+
+        o3d.visualization.draw_geometries(
+            [cloud],
+            window_name=f"Point Cloud - {ply_path.name}",
         )
