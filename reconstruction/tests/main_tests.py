@@ -21,6 +21,7 @@ import tests.debug_reconstruction as debug
 
 
 from src_v2.reconstruction.openmvg import OpenMVG
+from src_v2.reconstruction.openmvs import OpenMVS
 from src_v2.reconstruction.pipeline import ReconstructionPipeline
 
 from src.config.camera import CAMERA_MATRIX
@@ -1145,9 +1146,11 @@ def _update_point_cloud_from_landmarks(
 
 def test_openmvg_pipeline():
     openmvg = OpenMVG()
+    openmvs = OpenMVS()
 
     pipeline = ReconstructionPipeline(
         openmvg=openmvg,
+        openmvs=openmvs,
         clean_output=True,
     )
 

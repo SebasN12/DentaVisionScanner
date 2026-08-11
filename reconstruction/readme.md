@@ -3,13 +3,15 @@
 This project contains two different 3D reconstruction pipelines:
 
 - Pipeline 1 (src/) – Custom pairwise pipeline implemented with OpenCV.
-- Pipeline 2 (src_v2/) – Reconstruction pipeline based on OpenMVG, with OpenMVG handling feature extraction, matching, geometric filtering, Structure-from-Motion, and sparse reconstruction.
+* Pipeline 2 (src_v2/) – Reconstruction pipeline based on OpenMVG and OpenMVS, with OpenMVG handling the SfM stage and OpenMVS generating the final dense point cloud.
 
 ## Requirements
 
 - Python 3.11–3.12 recommended
 
-For Pipeline 2, you additionally need a compiled installation of OpenMVG.
+For Pipeline 2, you additionally need a compiled installation of OpenMVG and the precompiled OpenMVS binaries.
+
+The current Pipeline 2 configuration is designed around the directory structures of the precompiled Windows x64 distributions for OpenMVS used during development. Manually compiled installations may require changes to the configured paths and are not currently guaranteed to be supported.
 
 ## Install dependencies
 
@@ -19,16 +21,17 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create a ```.env``` file in the reconstruction folder.
+Create a `.env` file in the reconstruction folder.
 
 The following paths are required:
 
 ```bash
 INPUT_IMAGES_DIRECTORY=C:\path\to\your\images
 OPENMVG_ROOT=C:\path\to\your\openMVG
+OPENMVS_ROOT=C:\path\to\your\openMVS
 ```
 
-```INPUT_IMAGES_DIRECTORY```
+`INPUT_IMAGES_DIRECTORY`
 
 Path to the directory containing the input images used for reconstruction.
 
@@ -38,7 +41,9 @@ Example:
 INPUT_IMAGES_DIRECTORY=C:\Users\username\DentaVisionScanner\reconstruction\data\test_dataset
 ```
 
-```OPENMVG_ROOT```
+---
+
+`OPENMVG_ROOT`
 
 Path to the root directory of the OpenMVG source/build tree.
 
@@ -70,6 +75,53 @@ For information about compiling OpenMVG, follow the official build instructions:
 
 OpenMVG – [Building the software](https://github.com/openMVG/openMVG/blob/develop/BUILD.md)
 
+---
+
+`OPENMVS_ROOT`
+
+Path to the directory containing the precompiled OpenMVS Windows x64 binaries.
+
+Example:
+```
+OPENMVS_ROOT=C:\dev\openMVS
+```
+
+The expected OpenMVS structure is:
+
+```
+OPENMVS_ROOT/
+├── DensifyPointCloud.exe
+├── InterfaceCOLMAP.exe
+├── InterfaceMetashape.exe
+├── InterfaceMVSNet.exe
+├── InterfacePolycam.exe
+├── ReconstructMesh.exe
+├── RefineMesh.exe
+├── Tests.exe
+├── TextureMesh.exe
+├── TransformScene.exe
+└── Viewer.exe
+```
+
+
+The project currently uses the precompiled Windows x64 OpenMVS distribution. The OpenMVS executables are expected to be located directly inside `OPENMVS_ROOT`.
+
+Download the required release from the official OpenMVS releases page:
+
+OpenMVS – [Latest releases](https://github.com/cdcseacave/openMVS/releases/latest)
+
+For the current development environment, the Windows x64 package is extracted to a directory such as:
+
+```
+C:\dev\openMVS\
+```
+
+and its path is configured through:
+
+```
+OPENMVS_ROOT=C:\dev\openMVS
+```
+
 ## Running the reconstruction
 
 ### Pipeline 1 – Custom OpenCV pipeline
@@ -81,13 +133,15 @@ No OpenMVG installation or additional configuration is required for this pipelin
 
 ### Pipeline 2 – OpenMVG pipeline
 
+<!-- TODO: complete with OpenMVS part -->
+
 This pipeline delegates most of the SfM processing to OpenMVG.
 
 Before running this pipeline, make sure that:
 
 1. OpenMVG has been compiled.
-2. ```OPENMVG_ROOT``` in .env points to the OpenMVG root directory.
-3. ```INPUT_IMAGES_DIRECTORY``` points to the image dataset.
+2. `OPENMVG_ROOT` in `.env` points to the OpenMVG root directory.
+3. `INPUT_IMAGES_DIRECTORY` points to the image dataset.
 4. The OpenMVG sensor-width database exists at the expected location.
 
 The OpenMVG pipeline uses OpenMVG's sensor-width database during image listing to obtain camera information when available. The camera model is configured in:
@@ -101,7 +155,7 @@ CAMERA_MODEL = 3
 which corresponds to OpenMVG's Pinhole radial 3 camera model.
 
 ## Output
-
+<!-- TODO: complete with OpenMVS part -->
 Reconstruction results are written to:
 
 ```
@@ -119,7 +173,7 @@ This directory contains intermediate OpenMVG files as well as reconstruction res
 
 In particular, the OpenMVG reconstruction produces sparse point-cloud files and a final point cloud that can be visualized by the project.
 
-The output/ directory may also contain results from other experiments and pipelines, so **do not delete the entire ```output/``` directory when cleaning OpenMVG intermediate files.**
+The output/ directory may also contain results from other experiments and pipelines, so **do not delete the entire `output/` directory when cleaning OpenMVG intermediate files.**
 
 ## Structure
 The current high-level structure is:
@@ -138,7 +192,7 @@ reconstruction/
 └── src_v2/
     └── ...
 ```
-The internal structure of ```src/``` and ```src_v2/``` are currently documented below for reference:
+The internal structure of `src/` and `src_v2/` are currently documented below for reference:
 
 ```
 src/
@@ -172,6 +226,8 @@ src/
         └── __init__.py
 ```
 ---
+<!-- TODO: complete with OpenMVS part -->
+
 ```
 src_v2/
 │

@@ -17,6 +17,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 # External paths
 # ---------------------------------------------------------------------------
 
+#OpenMVG
+
 INPUT_IMAGES_DIRECTORY = Path(
     os.environ["INPUT_IMAGES_DIRECTORY"]
 )
@@ -41,6 +43,13 @@ SENSOR_WIDTH_DATABASE = (
     / "sensor_width_camera_database.txt"
 )
 
+# OpenMVS
+
+OPENMVS_ROOT = Path(
+    os.environ["OPENMVS_ROOT"]
+)
+
+
 # ---------------------------------------------------------------------------
 # Project paths
 # ---------------------------------------------------------------------------
@@ -48,6 +57,8 @@ SENSOR_WIDTH_DATABASE = (
 OUTPUT_DIRECTORY = PROJECT_ROOT / "output"
 
 OPENMVG_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY / "openmvg"
+
+OPENMVS_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY / "openmvs"
 
 
 # ---------------------------------------------------------------------------
