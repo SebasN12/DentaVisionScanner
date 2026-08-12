@@ -1144,7 +1144,23 @@ def _update_point_cloud_from_landmarks(
 
 # Pipeline B: OpenMVG reconstruction
 
-def test_openmvg_pipeline():
+def test_openmvg_sparse_pipeline():
+    openmvg = OpenMVG()
+
+    pipeline = ReconstructionPipeline(
+        openmvg=openmvg,
+        clean_output=True,
+    )
+
+    point_cloud = pipeline.run_sparse()
+
+    print("\nSparse point cloud generated at:")
+    print(point_cloud)
+
+    visualizer = Visualizer()
+    visualizer.show_ply(point_cloud)
+
+def test_openmvs_prepare_dense():
     openmvg = OpenMVG()
     openmvs = OpenMVS()
 
@@ -1154,11 +1170,23 @@ def test_openmvg_pipeline():
         clean_output=True,
     )
 
-    point_cloud = pipeline.run()
+    scene = pipeline.prepare_dense()
 
-    print(f"\nPoint cloud generated at:")
+    print("\nOpenMVS scene generated at:")
+    print(scene)
+
+def test_openmvs_dense_pipeline():
+    openmvs = OpenMVS()
+
+    pipeline = ReconstructionPipeline(
+        openmvs=openmvs,
+        clean_output=True,
+    )
+
+    point_cloud = pipeline.run_dense()
+
+    print("\nDense point cloud generated at:")
     print(point_cloud)
 
     visualizer = Visualizer()
-
     visualizer.show_ply(point_cloud)

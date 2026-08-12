@@ -2,8 +2,8 @@
 
 This project contains two different 3D reconstruction pipelines:
 
-- Pipeline 1 (src/) – Custom pairwise pipeline implemented with OpenCV.
-* Pipeline 2 (src_v2/) – Reconstruction pipeline based on OpenMVG and OpenMVS, with OpenMVG handling the SfM stage and OpenMVS generating the final dense point cloud.
+- Pipeline 1 (`src/`) – Custom pairwise pipeline implemented with OpenCV.
+* Pipeline 2 (`src_v2/`) – Reconstruction pipeline based on OpenMVG and OpenMVS, with OpenMVG handling the SfM stage and OpenMVS generating the final dense point cloud.
 
 ## Requirements
 
@@ -12,6 +12,8 @@ This project contains two different 3D reconstruction pipelines:
 For Pipeline 2, you additionally need a compiled installation of OpenMVG and the precompiled OpenMVS binaries.
 
 The current Pipeline 2 configuration is designed around the directory structures of the precompiled Windows x64 distributions for OpenMVS used during development. Manually compiled installations may require changes to the configured paths and are not currently guaranteed to be supported.
+
+OpenMVS is used for optional dense reconstruction. The sparse reconstruction stage can be run independently using OpenMVG.
 
 ## Install dependencies
 
@@ -75,6 +77,8 @@ For information about compiling OpenMVG, follow the official build instructions:
 
 OpenMVG – [Building the software](https://github.com/openMVG/openMVG/blob/develop/BUILD.md)
 
+Only the executables required by the current pipeline need to be present. In particular, the pipeline currently uses `openMVG_main_SfMInit_ImageListing.exe`, `openMVG_main_ComputeFeatures.exe`, `openMVG_main_ComputeMatches.exe`, `openMVG_main_GeometricFilter.exe`, `openMVG_main_SfM.exe`, and `openMVG_main_ComputeSfM_DataColor.exe`.
+
 ---
 
 `OPENMVS_ROOT`
@@ -121,6 +125,7 @@ and its path is configured through:
 ```
 OPENMVS_ROOT=C:\dev\openMVS
 ```
+Only the executables required by the current pipeline need to be present. In particular, the pipeline currently uses `DensifyPointCloud.exe` and the OpenMVG-to-OpenMVS conversion executable.
 
 ## Running the reconstruction
 
@@ -133,29 +138,39 @@ No OpenMVG installation or additional configuration is required for this pipelin
 
 ### Pipeline 2 – OpenMVG pipeline
 
-<!-- TODO: complete with OpenMVS part -->
+This pipeline uses OpenMVG for sparse Structure-from-Motion (SfM) reconstruction and optionally uses OpenMVS for dense reconstruction.
 
-This pipeline delegates most of the SfM processing to OpenMVG.
+The pipeline is divided into three independent stages:
 
-Before running this pipeline, make sure that:
+1. Sparse reconstruction with OpenMVG.
+2. OpenMVS scene preparation.
+3. Dense reconstruction with OpenMVS.
+
+The stages can be executed independently as long as the required output of the previous stage exists.
+
+Before running the pipeline, make sure that:
 
 1. OpenMVG has been compiled.
 2. `OPENMVG_ROOT` in `.env` points to the OpenMVG root directory.
-3. `INPUT_IMAGES_DIRECTORY` points to the image dataset.
-4. The OpenMVG sensor-width database exists at the expected location.
+3. `OPENMVS_ROOT` in `.env` points to the OpenMVS binary directory.
+4. `INPUT_IMAGES_DIRECTORY` points to the image dataset.
+5. The OpenMVG sensor-width database exists at the expected location.
 
 The OpenMVG pipeline uses OpenMVG's sensor-width database during image listing to obtain camera information when available. The camera model is configured in:
+
 ```
 src_v2/config/settings.py
 ```
+
 The current configuration uses:
+
 ```
 CAMERA_MODEL = 3
 ```
 which corresponds to OpenMVG's Pinhole radial 3 camera model.
 
 ## Output
-<!-- TODO: complete with OpenMVS part -->
+
 Reconstruction results are written to:
 
 ```
@@ -165,15 +180,27 @@ output/
 The OpenMVG pipeline uses a dedicated subdirectory:
 
 ```
-output/
-└── openmvg/
+openmvg/
+│   └── sfm/
 ```
 
 This directory contains intermediate OpenMVG files as well as reconstruction results generated during the pipeline.
 
-In particular, the OpenMVG reconstruction produces sparse point-cloud files and a final point cloud that can be visualized by the project.
+The OpenMVG stage produces the sparse reconstruction inside the `openmvg/` directory. The OpenMVS stages use a separate `openmvs/` directory for scene preparation and dense reconstruction.
 
-The output/ directory may also contain results from other experiments and pipelines, so **do not delete the entire `output/` directory when cleaning OpenMVG intermediate files.**
+```
+openmvs/
+    ├── scene.mvs
+    ├── undistorted/
+    └── dense/
+        └── pointcloud.ply
+```
+
+The `openmvs/` directory contains the OpenMVS scene, the undistorted images used for dense reconstruction, and the generated dense point cloud.
+
+The stages can therefore be cleaned independently without removing the results of the other reconstruction stage.
+
+The `output/` directory may also contain results from other experiments and pipelines, so **do not delete the entire `output/` directory when cleaning intermediate files.**
 
 ## Structure
 The current high-level structure is:
@@ -226,7 +253,6 @@ src/
         └── __init__.py
 ```
 ---
-<!-- TODO: complete with OpenMVS part -->
 
 ```
 src_v2/

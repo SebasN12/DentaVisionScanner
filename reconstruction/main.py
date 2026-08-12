@@ -36,7 +36,11 @@ def main():
 
     # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "point_cloud.ply")
 
-    tests.test_openmvg_pipeline()
+    tests.test_openmvg_sparse_pipeline()
+
+    tests.test_openmvs_prepare_dense()
+
+    tests.test_openmvs_dense_pipeline()
 
 
 
