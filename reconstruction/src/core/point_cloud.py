@@ -16,5 +16,3 @@ class PointCloud:
     points: np.ndarray
 
     colors: np.ndarray | None = None
-
-    track_ids: list[int] | None = None

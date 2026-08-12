@@ -1,28 +1,32 @@
 """
-Bundle Adjustment optimization.
+Bundle Adjustment optimization for pairwise reconstruction.
 """
 
 import cv2
 import numpy as np
-from scipy.sparse import lil_matrix
 
 from scipy.optimize import least_squares
+from scipy.sparse import lil_matrix
 
-from src.core.reconstruction import Reconstruction
-from src.core.camera_pose import CameraPose
-
-from src.optimization.ba_problem import (
-    BAProblem,
-    BAObservation,
-)
+from src.optimization.ba_problem import BAProblem
 
 
 class BundleAdjustment:
     """
-    Optimizes camera poses and landmark positions
-    by minimizing reprojection error.
-    """
+    Optimizes the relative pose of the second camera and
+    the reconstructed 3D points by minimizing reprojection error.
 
+    The first camera is fixed as the world reference camera:
+
+        R1 = I
+        t1 = 0
+
+    The optimization variables are:
+
+        - rotation of camera 2
+        - translation of camera 2
+        - 3D point positions
+    """
 
     def __init__(
         self,
@@ -30,406 +34,223 @@ class BundleAdjustment:
     ):
         self.camera_matrix = camera_matrix
 
-
     def optimize(
         self,
-        reconstruction: Reconstruction,
-    ) -> None:
+        problem: BAProblem,
+    ) -> BAProblem:
         """
-        Runs Bundle Adjustment and updates the reconstruction.
+        Runs pairwise Bundle Adjustment.
+
+        The first camera remains fixed. The second camera pose
+        and all 3D points are optimized.
+
+        Returns
+        -------
+        BAProblem
+            The optimized pairwise reconstruction data.
         """
 
-        problem = self._build_problem(
-            reconstruction
-        )
-
-
-        if len(problem.observations) == 0:
-            raise RuntimeError(
-                "No observations available for Bundle Adjustment."
-            )
-
+        self._validate_problem(problem)
 
         parameters = self._pack_parameters(
-            reconstruction,
-            problem,
+            problem
         )
 
         jacobian_sparsity = (
             self._create_jacobian_sparsity(
-                problem
+                len(problem.points_3d)
             )
         )
-
 
         result = least_squares(
             self._residuals,
             parameters,
-            args=(
-                problem,
-                reconstruction,
-            ),
+            args=(problem,),
             jac_sparsity=jacobian_sparsity,
             method="trf",
             verbose=1,
-            max_nfev=200
+            max_nfev=200,
         )
 
+        if not np.all(np.isfinite(result.x)):
+            raise RuntimeError(
+                "Bundle Adjustment produced "
+                "non-finite parameters."
+            )
 
-        self._write_back(
-            reconstruction,
+        return self._build_optimized_problem(
             problem,
             result.x,
         )
 
-
-    def _build_problem(
+    def _validate_problem(
         self,
-        reconstruction: Reconstruction,
-    ) -> BAProblem:
+        problem: BAProblem,
+    ) -> None:
         """
-        Creates compact optimization indices.
+        Validates the data required for optimization.
         """
 
-        frame_names = list(
-            reconstruction.camera_poses.keys()
-        )
+        if len(problem.points_3d) == 0:
+            raise RuntimeError(
+                "No 3D points available for Bundle Adjustment."
+            )
 
-
-        camera_index = {}
-
-        for index, frame_name in enumerate(
-            frame_names
+        if len(problem.image_points1) != len(
+            problem.points_3d
         ):
-            camera_id = reconstruction.camera_ids[
-                frame_name
-            ]
+            raise ValueError(
+                "Number of observations in image 1 "
+                "does not match number of 3D points."
+            )
 
-            camera_index[camera_id] = index
-
-
-
-        landmark_ids = list(
-            reconstruction.landmarks.keys()
-        )
-
-
-        landmark_index = {}
-
-        for index, landmark_id in enumerate(
-            landmark_ids
+        if len(problem.image_points2) != len(
+            problem.points_3d
         ):
-            landmark_index[
-                landmark_id
-            ] = index
+            raise ValueError(
+                "Number of observations in image 2 "
+                "does not match number of 3D points."
+            )
 
+        if problem.rotation.shape != (3, 3):
+            raise ValueError(
+                "Camera rotation must have shape (3, 3)."
+            )
 
-
-        observations = []
-
-
-        for landmark_id, landmark in (
-            reconstruction.landmarks.items()
-        ):
-
-            if landmark_id not in landmark_index:
-                continue
-
-
-            l_index = landmark_index[
-                landmark_id
-            ]
-
-
-            for obs in landmark.observations:
-
-                if obs.camera_id not in camera_index:
-                    continue
-
-
-                observations.append(
-                    BAObservation(
-                        camera_index=camera_index[
-                            obs.camera_id
-                        ],
-
-                        landmark_index=l_index,
-
-                        image_point=obs.image_point,
-                    )
-                )
-
-
-        return BAProblem(
-            frame_names=frame_names,
-
-            landmark_ids=landmark_ids,
-
-            camera_index=camera_index,
-
-            landmark_index=landmark_index,
-
-            observations=observations,
-        )
-
+        if problem.translation.size != 3:
+            raise ValueError(
+                "Camera translation must contain 3 values."
+            )
 
     def _pack_parameters(
         self,
-        reconstruction: Reconstruction,
         problem: BAProblem,
     ) -> np.ndarray:
         """
-        Converts poses and landmarks into optimization vector.
+        Converts the pairwise reconstruction into
+        an optimization vector.
+
+        Layout:
+
+            [rvec2]
+            [tvec2]
+            [X0]
+            [X1]
+            ...
+            [XN]
         """
 
-        parameters = []
+        rotation_vector, _ = cv2.Rodrigues(
+            problem.rotation
+        )
 
+        parameters = [
+            *rotation_vector.reshape(3),
+            *problem.translation.reshape(3),
+        ]
 
-        # Cameras
-        for frame_name in problem.frame_names:
-
-            pose = reconstruction.camera_poses[
-                frame_name
-            ]
-
-
-            rotation_vector, _ = cv2.Rodrigues(
-                pose.rotation
-            )
-
-
+        for point in problem.points_3d:
             parameters.extend(
-                rotation_vector.reshape(3)
+                point.reshape(3)
             )
-
-            parameters.extend(
-                pose.translation.reshape(3)
-            )
-
-
-
-        # Landmarks
-        for landmark_id in problem.landmark_ids:
-
-            landmark = reconstruction.landmarks[
-                landmark_id
-            ]
-
-            parameters.extend(
-                landmark.position.reshape(3)
-            )
-
 
         return np.asarray(
             parameters,
             dtype=np.float64,
         )
 
-
     def _residuals(
         self,
         parameters: np.ndarray,
         problem: BAProblem,
-        reconstruction: Reconstruction,
     ) -> np.ndarray:
         """
-        Computes reprojection errors.
+        Computes reprojection errors for both cameras.
+
+        Camera 1 is fixed as:
+
+            R1 = I
+            t1 = 0
+
+        Camera 2 is taken from the optimization parameters.
         """
 
-        residuals = []
+        rotation_vector = parameters[:3]
 
+        translation = parameters[
+            3:6
+        ].reshape(3, 1)
 
-        camera_block_size = 6
+        points = parameters[
+            6:
+        ].reshape(-1, 3)
 
-        landmark_start = (
-            len(problem.frame_names)
-            *
-            camera_block_size
+        projected1, _ = cv2.projectPoints(
+            points,
+            np.zeros((3, 1)),
+            np.zeros((3, 1)),
+            self.camera_matrix,
+            None,
         )
 
-
-        for observation in problem.observations:
-
-
-            camera_offset = (
-                observation.camera_index
-                *
-                camera_block_size
-            )
-
-
-            rvec = parameters[
-                camera_offset:
-                camera_offset + 3
-            ]
-
-
-            tvec = parameters[
-                camera_offset + 3:
-                camera_offset + 6
-            ]
-
-
-
-            landmark_offset = (
-                landmark_start
-                +
-                observation.landmark_index
-                *
-                3
-            )
-
-
-            point = parameters[
-                landmark_offset:
-                landmark_offset + 3
-            ]
-
-
-            projected, _ = cv2.projectPoints(
-                point.reshape(1, 3),
-                rvec,
-                tvec.reshape(3, 1),
-                self.camera_matrix,
-                None,
-            )
-
-
-            projected = projected.reshape(2)
-
-
-            error = (
-                projected
-                -
-                observation.image_point
-            )
-
-
-            residuals.extend(
-                error
-            )
-
-
-        return np.asarray(
-            residuals
+        projected2, _ = cv2.projectPoints(
+            points,
+            rotation_vector,
+            translation,
+            self.camera_matrix,
+            None,
         )
 
+        projected1 = projected1.reshape(-1, 2)
+        projected2 = projected2.reshape(-1, 2)
 
-    def _write_back(
-        self,
-        reconstruction: Reconstruction,
-        problem: BAProblem,
-        parameters: np.ndarray,
-    ) -> None:
-        """
-        Writes optimized values back into reconstruction.
-        """
-
-        camera_block_size = 6
-
-
-        for index, frame_name in enumerate(
-            problem.frame_names
-        ):
-
-            offset = (
-                index
-                *
-                camera_block_size
-            )
-
-
-            rvec = parameters[
-                offset:
-                offset + 3
-            ]
-
-
-            tvec = parameters[
-                offset + 3:
-                offset + 6
-            ]
-
-
-            rotation, _ = cv2.Rodrigues(
-                rvec
-            )
-
-
-            reconstruction.camera_poses[
-                frame_name
-            ] = CameraPose(
-                rotation=rotation,
-
-                translation=tvec.reshape(3, 1),
-            )
-
-
-
-        landmark_start = (
-            len(problem.frame_names)
-            *
-            camera_block_size
+        error1 = (
+            projected1
+            -
+            problem.image_points1
         )
 
+        error2 = (
+            projected2
+            -
+            problem.image_points2
+        )
 
-        for index, landmark_id in enumerate(
-            problem.landmark_ids
-        ):
-
-            offset = (
-                landmark_start
-                +
-                index
-                *
-                3
+        return np.concatenate(
+            (
+                error1.reshape(-1),
+                error2.reshape(-1),
             )
-
-
-            reconstruction.landmarks[
-                landmark_id
-            ].position = parameters[
-                offset:
-                offset + 3
-            ]
+        )
 
     def _create_jacobian_sparsity(
         self,
-        problem: BAProblem,
+        n_points: int,
     ):
         """
-        Creates sparse Jacobian structure.
+        Creates the sparse Jacobian structure.
 
-        Each observation depends only on:
-        - one camera
-        - one landmark
+        Each observation depends on:
+
+            - camera 2 parameters
+            - its corresponding 3D point
+
+        Camera 1 is fixed and therefore has no
+        optimization parameters.
         """
 
-        
-
-
-        n_cameras = len(
-            problem.frame_names
-        )
-
-        n_landmarks = len(
-            problem.landmark_ids
-        )
-
+        camera_parameter_count = 6
+        point_parameter_count = 3
 
         n_parameters = (
-            n_cameras * 6
+            camera_parameter_count
             +
-            n_landmarks * 3
+            n_points * point_parameter_count
         )
-
 
         n_residuals = (
-            len(problem.observations)
-            *
-            2
+            n_points * 4
         )
-
 
         sparsity = lil_matrix(
             (
@@ -439,51 +260,79 @@ class BundleAdjustment:
             dtype=int,
         )
 
+        for i in range(n_points):
 
-        for i, observation in enumerate(
-            problem.observations
-        ):
-
-            residual_index = i * 2
-
-
-            #
-            # Camera parameters
-            #
-            camera_start = (
-                observation.camera_index
-                *
-                6
-            )
-
-
-            sparsity[
-                residual_index:
-                residual_index + 2,
-                camera_start:
-                camera_start + 6,
-            ] = 1
-
-
-
-            #
-            # Landmark parameters
-            #
-            landmark_start = (
-                n_cameras * 6
+            point_start = (
+                camera_parameter_count
                 +
-                observation.landmark_index
-                *
-                3
+                i * point_parameter_count
             )
 
+            #
+            # Camera 1 residuals
+            #
+            residual1_start = i * 2
 
             sparsity[
-                residual_index:
-                residual_index + 2,
-                landmark_start:
-                landmark_start + 3,
+                residual1_start:
+                residual1_start + 2,
+                point_start:
+                point_start + 3,
             ] = 1
 
+            #
+            # Camera 2 residuals
+            #
+            residual2_start = (
+                n_points * 2
+                +
+                i * 2
+            )
+
+            sparsity[
+                residual2_start:
+                residual2_start + 2,
+                :camera_parameter_count,
+            ] = 1
+
+            sparsity[
+                residual2_start:
+                residual2_start + 2,
+                point_start:
+                point_start + 3,
+            ] = 1
 
         return sparsity.tocsr()
+
+    def _build_optimized_problem(
+        self,
+        problem: BAProblem,
+        parameters: np.ndarray,
+    ) -> BAProblem:
+        """
+        Converts optimized parameters back into a BAProblem.
+        """
+
+        rotation_vector = parameters[
+            :3
+        ]
+
+        translation = parameters[
+            3:6
+        ].reshape(3, 1)
+
+        rotation, _ = cv2.Rodrigues(
+            rotation_vector
+        )
+
+        points_3d = parameters[
+            6:
+        ].reshape(-1, 3)
+
+        return BAProblem(
+            rotation=rotation,
+            translation=translation,
+            points_3d=points_3d,
+            image_points1=problem.image_points1,
+            image_points2=problem.image_points2,
+        )

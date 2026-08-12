@@ -9,6 +9,8 @@ def main():
 
     # Pipeline A: pairwise reconstruction with OpenCV
 
+    # tests.load_frames()
+
     # tests.test_camera()
 
     # tests.test_features()
@@ -19,13 +21,9 @@ def main():
 
     # tests.test_triangulation()
 
-    # tests.test_reconstruction()
+    # tests.test_pairwise_reconstruction()
 
-    # tests.test_sequential_reconstruction()
-
-    # tests.test_sequential_reconstruction_with_tracks()
-
-    # tests.test_sequential_reconstruction()
+    tests.test_pairwise_bundle_adjustment()
 
 
     # Pipeline B: OpenMVG reconstruction
@@ -36,11 +34,11 @@ def main():
 
     # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "point_cloud.ply")
 
-    tests.test_openmvg_sparse_pipeline()
+    # tests.test_openmvg_sparse_pipeline()
 
-    tests.test_openmvs_prepare_dense()
+    # tests.test_openmvs_prepare_dense()
 
-    tests.test_openmvs_dense_pipeline()
+    # tests.test_openmvs_dense_pipeline()
 
 
 

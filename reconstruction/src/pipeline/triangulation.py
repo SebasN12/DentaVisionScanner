@@ -1,12 +1,14 @@
 """
 3D point triangulation.
 """
+
 import cv2
 import numpy as np
 
-from src.core.match_result import MatchResult
 from src.core.frame import Frame
+from src.core.match_result import MatchResult
 from src.core.point_cloud import PointCloud
+from src.core.triangulation_result import TriangulationResult
 
 
 class Triangulator:
@@ -18,9 +20,22 @@ class Triangulator:
         self,
         result: MatchResult,
         camera_matrix: np.ndarray,
-        track_ids: list[int] | None = None,
         max_reprojection_error: float = 3.0,
-    ) -> PointCloud:
+    ) -> TriangulationResult:
+        """
+        Triangulates 3D points from a single image pair.
+
+        The first camera is defined as the world reference
+        camera:
+
+            R1 = I
+            t1 = 0
+
+        The second camera uses the relative pose estimated
+        from the pair:
+
+            X_camera2 = R * X_world + t
+        """
 
         if (
             result.rotation is None
@@ -38,20 +53,30 @@ class Triangulator:
                 "No inlier matches available."
             )
 
+        #
+        # Extract corresponding image points
+        #
         points1 = np.float32(
             [
-                result.frame1.keypoints[m.queryIdx].pt
-                for m in result.inlier_matches
+                result.frame1.keypoints[
+                    match.queryIdx
+                ].pt
+                for match in result.inlier_matches
             ]
         ).T
 
         points2 = np.float32(
             [
-                result.frame2.keypoints[m.trainIdx].pt
-                for m in result.inlier_matches
+                result.frame2.keypoints[
+                    match.trainIdx
+                ].pt
+                for match in result.inlier_matches
             ]
         ).T
 
+        #
+        # Projection matrices
+        #
         projection1 = camera_matrix @ np.hstack(
             (
                 np.eye(3),
@@ -62,10 +87,13 @@ class Triangulator:
         projection2 = camera_matrix @ np.hstack(
             (
                 result.rotation,
-                result.translation,
+                result.translation.reshape(3, 1),
             )
         )
 
+        #
+        # Triangulate points
+        #
         homogeneous_points = cv2.triangulatePoints(
             projection1,
             projection2,
@@ -79,28 +107,44 @@ class Triangulator:
 
         points = points.reshape(-1, 3)
 
+        #
+        # Extract point colors
+        #
         colors = self._extract_colors(
             result.frame1,
             result.inlier_matches,
         )
-        
-        points, colors, track_ids = self._filter_points(
+
+        #
+        # Remove invalid points while keeping all
+        # corresponding data aligned.
+        #
+        (
             points,
             points1,
             points2,
-            projection1,
-            projection2,
-            result.rotation,
-            result.translation,
             colors,
-            track_ids,
-            max_reprojection_error,
+        ) = self._filter_points(
+            points=points,
+            points1=points1,
+            points2=points2,
+            projection1=projection1,
+            projection2=projection2,
+            rotation=result.rotation,
+            translation=result.translation,
+            colors=colors,
+            max_reprojection_error=max_reprojection_error,
         )
 
-        return PointCloud(
+        point_cloud = PointCloud(
             points=points,
             colors=colors,
-            track_ids=track_ids,
+        )
+
+        return TriangulationResult(
+            point_cloud=point_cloud,
+            image_points1=points1,
+            image_points2=points2,
         )
 
     def _extract_colors(
@@ -139,7 +183,7 @@ class Triangulator:
             return None
 
         return np.asarray(colors)
-    
+
     def _filter_points(
         self,
         points: np.ndarray,
@@ -150,25 +194,36 @@ class Triangulator:
         rotation: np.ndarray,
         translation: np.ndarray,
         colors: np.ndarray | None,
-        track_ids: list[int] | None,
         max_reprojection_error: float,
-    ):
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray | None,
+    ]:
         """
         Removes geometrically invalid triangulated points.
+
+        The 3D points, 2D observations, and colors are
+        filtered together so that their indices remain
+        aligned.
         """
 
         filtered_points = []
+        filtered_points1 = []
+        filtered_points2 = []
 
-        filtered_colors = [] if colors is not None else None
-
-        filtered_track_ids = (
+        filtered_colors = (
             []
-            if track_ids is not None
+            if colors is not None
             else None
         )
 
         for i, point in enumerate(points):
 
+            #
+            # Cheirality check
+            #
             if not self._is_in_front_of_cameras(
                 point,
                 rotation,
@@ -176,7 +231,9 @@ class Triangulator:
             ):
                 continue
 
-
+            #
+            # Reprojection error check
+            #
             error = self._compute_reprojection_error(
                 point,
                 points1[:, i],
@@ -188,32 +245,32 @@ class Triangulator:
             if error > max_reprojection_error:
                 continue
 
-
             filtered_points.append(point)
 
+            filtered_points1.append(
+                points1[:, i]
+            )
+
+            filtered_points2.append(
+                points2[:, i]
+            )
 
             if colors is not None:
                 filtered_colors.append(
                     colors[i]
                 )
 
-
-            if track_ids is not None:
-                filtered_track_ids.append(
-                    track_ids[i]
-                )
-
-
         return (
             np.asarray(filtered_points),
+            np.asarray(filtered_points1),
+            np.asarray(filtered_points2),
             (
                 np.asarray(filtered_colors)
                 if filtered_colors is not None
                 else None
             ),
-            filtered_track_ids,
         )
-    
+
     def _compute_reprojection_error(
         self,
         point: np.ndarray,
@@ -233,10 +290,8 @@ class Triangulator:
             )
         )
 
-
         projected1 = projection1 @ point_h
         projected2 = projection2 @ point_h
-
 
         projected1 = (
             projected1[:2]
@@ -250,7 +305,6 @@ class Triangulator:
             projected2[2]
         )
 
-
         error1 = np.linalg.norm(
             projected1 - observed1
         )
@@ -259,11 +313,10 @@ class Triangulator:
             projected2 - observed2
         )
 
-
         return (
             error1 + error2
         ) / 2.0
-    
+
     def _is_in_front_of_cameras(
         self,
         point: np.ndarray,
@@ -271,17 +324,20 @@ class Triangulator:
         translation: np.ndarray,
     ) -> bool:
         """
-        Checks cheirality condition.
+        Checks the cheirality condition.
 
         The 3D point must be in front of both cameras.
         """
 
+        #
         # First camera
+        #
         if point[2] <= 0:
             return False
 
-
+        #
         # Second camera
+        #
         point_camera2 = (
             rotation @ point
             +
@@ -290,6 +346,5 @@ class Triangulator:
 
         if point_camera2[2] <= 0:
             return False
-
 
         return True

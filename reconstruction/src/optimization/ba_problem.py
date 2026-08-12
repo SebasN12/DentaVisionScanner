@@ -1,5 +1,5 @@
 """
-Internal data structures used by Bundle Adjustment.
+Internal data structures used by pairwise Bundle Adjustment.
 """
 
 from dataclasses import dataclass
@@ -8,35 +8,20 @@ import numpy as np
 
 
 @dataclass(slots=True)
-class BAObservation:
-    """
-    Observation used internally by Bundle Adjustment.
-
-    Uses compact indices instead of persistent IDs.
-    """
-
-    camera_index: int
-
-    landmark_index: int
-
-    image_point: np.ndarray
-
-
-@dataclass(slots=True)
 class BAProblem:
     """
-    Internal optimization representation.
+    Internal optimization representation for pairwise Bundle Adjustment.
 
-    Converts Reconstruction data into compact arrays
-    suitable for numerical optimization.
+    The first camera is fixed as the world reference camera.
+    The second camera pose and the 3D points are optimized.
     """
 
-    frame_names: list[str]
+    rotation: np.ndarray
 
-    landmark_ids: list[int]
+    translation: np.ndarray
 
-    camera_index: dict[int, int]
+    points_3d: np.ndarray
 
-    landmark_index: dict[int, int]
+    image_points1: np.ndarray
 
-    observations: list[BAObservation]
+    image_points2: np.ndarray

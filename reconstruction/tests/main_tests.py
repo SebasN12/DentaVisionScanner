@@ -1,5 +1,3 @@
-from xml.parsers.expat import errors
-
 import cv2
 import numpy as np
 
@@ -11,13 +9,10 @@ from src.pipeline.pose import PoseEstimator
 from src.pipeline.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 from src.io.point_cloud_writer import PointCloudWriter
-from src.io.pose_writer import PoseWriter
-from src.pipeline.track_builder import TrackBuilder
-from src.pipeline.landmark_manager import LandmarkManager
 from src.optimization.bundle_adjustment import BundleAdjustment
 from src.core.reconstruction import Reconstruction
-from src.core.landmark import Landmark
-import tests.debug_reconstruction as debug
+from src.optimization.ba_problem import BAProblem
+from src.core.point_cloud import PointCloud
 
 
 from src_v2.reconstruction.openmvg import OpenMVG
@@ -31,8 +26,7 @@ from src.config.paths import (
     FEATURES_OUTPUT,
     MATCHES_OUTPUT,
     INLIERS_OUTPUT,
-    POSES_OUTPUT_FILE,
-    RECONSTRUCTION_OUTPUT_FILE
+    RECONSTRUCTION_OUTPUT_FILE,
 )
 
 
@@ -111,1035 +105,412 @@ def test_matching():
         print(f"Saved: {output}")
 
 def test_pose():
+    """
+    Tests relative camera pose estimation for a single image pair.
+    """
 
-    frames = load_frames()
+    frame1, frame2, result = prepare_test_pair()
 
-    detector = FeatureDetector()
-    detector.detect_sequence(frames)
+    print(
+        f"Pair: "
+        f"{frame1.filename} -> "
+        f"{frame2.filename}"
+    )
 
-    matcher = FeatureMatcher()
-    results = matcher.match_sequence(frames)
+    print(
+        f"Good matches: "
+        f"{len(result.good_matches)}"
+    )
 
-    estimator = PoseEstimator()
+    print(
+        f"RANSAC inliers: "
+        f"{result.ransac_mask.sum()}"
+    )
 
-    for result in results:
+    print(
+        f"Pose inliers: "
+        f"{len(result.inlier_matches)}"
+    )
 
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-        print(
-            f"{result.frame1.filename}"
-            f" -> "
-            f"{result.frame2.filename}"
-        )
-
-        print(
-            f"Good matches: "
-            f"{len(result.good_matches)}"
-        )
-
-        print(
-            f"RANSAC inliers: "
-            f"{result.ransac_mask.sum()}"
-        )
-
-        print(
-            f"Pose inliers: "
-            f"{len(result.inlier_matches)}"
-        )
-
-        print()
-
-        Visualizer.draw_matches(
-            result,
-            INLIERS_OUTPUT,
-            use_inliers=True,
-        )
+    Visualizer.draw_matches(
+        result,
+        INLIERS_OUTPUT,
+        use_inliers=True,
+    )
 
 def test_triangulation():
+    """
+    Tests triangulation for a single image pair.
+    """
 
-    frames = load_frames()
-
-    detector = FeatureDetector()
-    detector.detect_sequence(frames)
-
-    matcher = FeatureMatcher()
-    results = matcher.match_sequence(frames)
-
-    estimator = PoseEstimator()
+    frame1, frame2, result = prepare_test_pair()
 
     triangulator = Triangulator()
 
-    for result in results:
-
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-        cloud = triangulator.triangulate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-        print(
-            f"{result.frame1.filename}"
-            f" -> "
-            f"{result.frame2.filename}"
-        )
-
-        print(
-            f"3D points: "
-            f"{len(cloud.points)}"
-        )
-
-        Visualizer.show_point_cloud(
-            cloud,
-        )
-
-def test_reconstruction():
-
-    frames = load_frames()
-
-    detector = FeatureDetector()
-
-    detector.detect_sequence(
-        frames
-    )
-
-    matcher = FeatureMatcher()
-
-    results = matcher.match_sequence(
-        frames
-    )
-
-    print("\nMatching statistics:")
-
-    for result in results:
-
-        print(
-            f"{result.frame1.filename} "
-            f"<-> "
-            f"{result.frame2.filename}"
-        )
-
-        print(
-            f"  Good matches: "
-            f"{len(result.good_matches)}"
-        )
-
-    print()
-
-    estimator = PoseEstimator()
-
-    for result in results:
-
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-        print(
-            f"{result.frame1.filename} "
-            f"-> "
-            f"{result.frame2.filename}"
-        )
-
-        print(
-            f"  Matches: "
-            f"{len(result.good_matches)}"
-        )
-
-        print(
-            f"  Pose inliers: "
-            f"{len(result.inlier_matches)}"
-        )
-
-    print()
-
-    triangulator = Triangulator()
-
-    track_builder = TrackBuilder()
-
-    landmark_manager = LandmarkManager()
-
-    reconstructor = Reconstructor(
-        triangulator,
-        track_builder,
-        landmark_manager,
-    )
-
-    reconstruction = reconstructor.reconstruct(
-        results,
+    triangulation = triangulator.triangulate(
+        result,
         CAMERA_MATRIX,
     )
 
-    print(
-        "\nReconstruction finished."
-    )
+    point_cloud = triangulation.point_cloud
 
-    print(
-        "Reconstruction statistics:"
-    )
-
-    print(
-        f"  Camera poses: "
-        f"{len(reconstruction.camera_poses)}"
-    )
-
-
-    if reconstruction.point_cloud is not None:
-
-        print(
-            f"3D points: "
-            f"{len(reconstruction.point_cloud.points)}"
-        )
-
-        Visualizer.show_point_cloud(
-            reconstruction.point_cloud
-        )
-
-    else:
-
-        print(
-            "No point cloud generated."
-        )
-
-
-def test_sequential_reconstruction():
-
-    frames = load_frames()
-
-
-    detector = FeatureDetector()
-
-    matcher = FeatureMatcher()
-
-    estimator = PoseEstimator()
-
-    triangulator = Triangulator()
-
-    track_builder = TrackBuilder()
-
-    landmark_manager = LandmarkManager()
-
-    reconstructor = Reconstructor(
-        triangulator,
-        track_builder,
-        landmark_manager,
-    )
-
-
-    previous_frame = None
-
-
-    for current_frame in frames:
-
-
-        #
-        # New frame arrives
-        #
-        detector.detect(
-            current_frame
-        )
-
-
-        print(
-            f"Processing: "
-            f"{current_frame.filename}"
-        )
-
-
-        #
-        # First frame only initializes
-        #
-        if previous_frame is None:
-
-            previous_frame = current_frame
-
-            continue
-
-
-
-        #
-        # Match previous frame with current frame
-        #
-        result = matcher.match(
-            previous_frame,
-            current_frame,
-        )
-
-
-        print(
-            f"Matches: "
-            f"{len(result.good_matches)}"
-        )
-
-
-
-        #
-        # Estimate camera movement
-        #
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-
-        print(
-            f"Pose estimated"
-        )
-
-
-
-        #
-        # Add pair to global reconstruction
-        #
-        reconstructor.update_pair(
-            result,
-            CAMERA_MATRIX,
-        )
-
-
-        print(
-            "Added to reconstruction"
-        )
-
-
-        print()
-
-
-        #
-        # Current frame becomes previous frame
-        #
-        previous_frame = current_frame
-
-
-
-    #
-    # Final reconstruction
-    #
-    reconstruction = (
-        reconstructor.get_reconstruction()
-    )
-
-
-    cloud = reconstruction.point_cloud
-
-
-    print(
-        f"Total 3D points: "
-        f"{len(cloud.points)}"
-    )
-
-
-
-    #
-    # Export point cloud
-    #
-    output = PointCloudWriter.write_ply(
-        cloud,
-        RECONSTRUCTION_OUTPUT_FILE,
-    )
-
-
-    print(
-        f"Saved point cloud: {output}"
-    )
-
-
-
-    #
-    # Export camera poses
-    #
-    pose_output = PoseWriter.write_json(
-        reconstruction.camera_poses,
-        POSES_OUTPUT_FILE,
-    )
-
-
-    print(
-        f"Saved poses: {pose_output}"
-    )
-
-
-
-    #
-    # Visualization
-    #
-    Visualizer.show_point_cloud(
-        cloud
-    )
-
-def test_sequential_reconstruction_with_tracks():
-
-    frames = load_frames()
-
-
-    detector = FeatureDetector()
-
-    matcher = FeatureMatcher()
-
-    estimator = PoseEstimator()
-
-    triangulator = Triangulator()
-
-    track_builder = TrackBuilder()
-
-    landmark_manager = LandmarkManager()
-
-
-    reconstructor = Reconstructor(
-        triangulator,
-        track_builder,
-        landmark_manager,
-    )
-
-
-
-    previous_frame = None
-
-
-
-    for current_frame in frames:
-
-
-        detector.detect(
-            current_frame
-        )
-
-
-        print(
-            f"\nProcessing: {current_frame.filename}"
-        )
-
-
-        #
-        # First frame only initializes sequence
-        #
-        if previous_frame is None:
-
-            previous_frame = current_frame
-
-            continue
-
-
-
-        #
-        # Match consecutive frames
-        #
-        result = matcher.match(
-            previous_frame,
-            current_frame,
-        )
-
-
-        #
-        # Estimate relative camera pose
-        #
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
-        )
-
-
-        #
-        # Integrate pair into reconstruction
-        #
-        reconstructor.update_pair(
-            result,
-            CAMERA_MATRIX,
-        )
-
-
-
-        #
-        # Debug tracks
-        #
-        tracks = (
-            track_builder.tracks.values()
-        )
-
-
-        print(
-            f"Tracks: {len(track_builder.tracks)}"
-        )
-
-
-        if len(track_builder.tracks) > 0:
-
-            lengths = [
-                track.length
-                for track in tracks
-            ]
-
-            print(
-                f"Track observations - "
-                f"min: {min(lengths)}, "
-                f"max: {max(lengths)}, "
-                f"avg: {sum(lengths)/len(lengths):.2f}"
-            )
-
-
-
-        #
-        # Debug landmarks
-        #
-        print(
-            f"Landmarks: "
-            f"{len(reconstructor.reconstruction.landmarks)}"
-        )
-
-
-        print(
-            "Added pair: "
-            f"{previous_frame.filename}"
-            f" -> "
-            f"{current_frame.filename}"
-        )
-
-
-        previous_frame = current_frame
-
-
-
-    #
-    # Final reconstruction
-    #
-    reconstruction = (
-        reconstructor.get_reconstruction()
-    )
-
-
-    cloud = reconstruction.point_cloud
-
-
-    if cloud is None:
-
+    if len(point_cloud.points) == 0:
         raise RuntimeError(
-            "No point cloud was generated."
+            "Triangulation produced no 3D points."
         )
 
-
-
-    print(
-        "\nFinal reconstruction"
-    )
-
-
-    print(
-        f"Final points: {len(cloud.points)}"
-    )
-
-
-    print(
-        f"Final landmarks: "
-        f"{len(reconstruction.landmarks)}"
-    )
-
-
-    print(
-        f"Final cameras: "
-        f"{len(reconstruction.camera_poses)}"
-    )
-
-
-
-    #
-    # Check landmark observations
-    #
-    landmarks = (
-        reconstruction.landmarks.values()
-    )
-
-
-    observation_lengths = [
-        len(landmark.observations)
-        for landmark in landmarks
-    ]
-
-
-    if observation_lengths:
-
-        print(
-            f"Landmark observations - "
-            f"min: {min(observation_lengths)}, "
-            f"max: {max(observation_lengths)}, "
-            f"avg: "
-            f"{sum(observation_lengths)/len(observation_lengths):.2f}"
+    if len(triangulation.image_points1) != len(
+        point_cloud.points
+    ):
+        raise RuntimeError(
+            "Image 1 observations do not match "
+            "the number of 3D points."
         )
 
-
-
-    #
-    # Check tracks without landmarks
-    #
-    tracks_without_landmark = [
-        track.id
-        for track in track_builder.tracks.values()
-        if track.landmark_id is None
-    ]
-
-
-    print(
-        f"Tracks without landmark: "
-        f"{len(tracks_without_landmark)}"
-    )
-
-
-    if len(tracks_without_landmark) > 0:
-
-        print(
-            "Example missing track ids:",
-            tracks_without_landmark[:10]
+    if len(triangulation.image_points2) != len(
+        point_cloud.points
+    ):
+        raise RuntimeError(
+            "Image 2 observations do not match "
+            "the number of 3D points."
         )
 
-
-
-    #
-    # Consistency check
-    #
-    print(
-        f"Track/Landmark consistency: "
-        f"{len(track_builder.tracks)} tracks "
-        f"vs "
-        f"{len(reconstruction.landmarks)} landmarks"
-    )
-
-    #
-    # Verify camera IDs
-    #
-    print(
-        f"Camera IDs: "
-        f"{len(reconstruction.camera_ids)}"
-    )
-
-    assert len(
-        reconstruction.camera_ids
-    ) == len(
-        reconstruction.camera_poses
-    )
-
-    #
-    # Verify observations contain camera IDs
-    #
-    for landmark in reconstruction.landmarks.values():
-
-        for observation in landmark.observations:
-
-            assert observation.camera_id in reconstruction.camera_ids.values()
+    if not np.all(
+        np.isfinite(point_cloud.points)
+    ):
+        raise RuntimeError(
+            "Triangulated points contain "
+            "non-finite values."
+        )
 
     print(
-        "All observations have valid camera IDs."
+        f"Pair: "
+        f"{frame1.filename} -> "
+        f"{frame2.filename}"
     )
-    
-
-    #
-    # Write result
-    #
-    output = PointCloudWriter.write_ply(
-        cloud,
-        RECONSTRUCTION_OUTPUT_FILE,
-    )
-
 
     print(
-        f"Saved: {output}"
+        f"Inlier matches: "
+        f"{len(result.inlier_matches)}"
     )
 
-
-def test_bundle_adjustment():
-
-    reconstruction = build_reconstruction()
-
-
-    print_reconstruction_summary(
-        reconstruction
+    print(
+        f"Triangulated points: "
+        f"{len(point_cloud.points)}"
     )
 
-
-    debug.debug_duplicate_tracks(
-        reconstruction
+    Visualizer.show_point_cloud(
+        point_cloud
     )
 
+def test_pairwise_reconstruction():
+    """
+    Tests the complete pairwise reconstruction pipeline.
 
-    debug.debug_camera_poses(
-        reconstruction
-    )
+    The pipeline consists of:
 
+        Feature Detection
+            ↓
+        Feature Matching
+            ↓
+        Relative Pose Estimation
+            ↓
+        Triangulation
+            ↓
+        Pairwise Bundle Adjustment
+            ↓
+        Optimized Point Cloud
+    """
 
-    debug.debug_landmarks(
-        reconstruction
-    )
+    frame1, frame2, result = prepare_test_pair()
 
-    debug.remove_bad_observations(
-        reconstruction,
-        CAMERA_MATRIX,
-        threshold=10,
-    )
+    triangulator = Triangulator()
 
-    errors_clean = compute_reprojection_errors(
-        reconstruction,
-        CAMERA_MATRIX,
-    )
-
-    print_error_statistics(
-        errors_clean,
-        "After filtering"
-    )
-
-
-    debug.debug_bad_observations(
-        reconstruction,
-        CAMERA_MATRIX,
-        threshold=10,
-    )
-
-    debug.remove_empty_landmarks(
-        reconstruction)
-    
-    debug.filter_short_tracks(reconstruction, minimum_observations=3)
-
-
-    ba = BundleAdjustment(
+    bundle_adjustment = BundleAdjustment(
         CAMERA_MATRIX
     )
 
+    reconstructor = Reconstructor(
+        triangulator,
+        bundle_adjustment,
+    )
 
-    print()
     print(
-        "Running Bundle Adjustment..."
+        f"Pair: "
+        f"{frame1.filename} -> "
+        f"{frame2.filename}"
     )
 
-
-    ba.optimize(
-        reconstruction
+    print(
+        f"Inlier matches: "
+        f"{len(result.inlier_matches)}"
     )
 
-
-    errors_after = compute_reprojection_errors(
-        reconstruction,
+    (
+        point_cloud,
+        image_points1,
+        image_points2,
+    ) = reconstructor.reconstruct(
+        result,
         CAMERA_MATRIX,
     )
 
+    if len(point_cloud.points) == 0:
+        raise RuntimeError(
+            "Pairwise reconstruction produced "
+            "no 3D points."
+        )
 
-    print_error_statistics(
-        errors_after,
-        "After BA"
+    if len(image_points1) != len(
+        point_cloud.points
+    ):
+        raise RuntimeError(
+            "Image 1 observations do not match "
+            "the number of reconstructed points."
+        )
+
+    if len(image_points2) != len(
+        point_cloud.points
+    ):
+        raise RuntimeError(
+            "Image 2 observations do not match "
+            "the number of reconstructed points."
+        )
+
+    if not np.all(
+        np.isfinite(point_cloud.points)
+    ):
+        raise RuntimeError(
+            "Reconstructed points contain "
+            "non-finite values."
+        )
+
+    print(
+        f"Reconstructed points: "
+        f"{len(point_cloud.points)}"
     )
-
-
-    _update_point_cloud_from_landmarks(
-        reconstruction
-    )
-
 
     Visualizer.show_point_cloud(
-        reconstruction.point_cloud
+        point_cloud
     )
 
+def test_pairwise_bundle_adjustment():
+    """
+    Tests pairwise triangulation and Bundle Adjustment.
+    """
 
-def build_reconstruction():
+    frame1, frame2, result = prepare_test_pair()
+
+    triangulator = Triangulator()
+
+    bundle_adjustment = BundleAdjustment(
+        CAMERA_MATRIX
+    )
+
+    triangulation = triangulator.triangulate(
+        result,
+        CAMERA_MATRIX,
+    )
+
+    if len(
+        triangulation.point_cloud.points
+    ) == 0:
+        raise RuntimeError(
+            "Triangulation produced no points."
+        )
+
+    problem = BAProblem(
+        rotation=result.rotation,
+        translation=result.translation,
+        points_3d=(
+            triangulation.point_cloud.points
+        ),
+        image_points1=(
+            triangulation.image_points1
+        ),
+        image_points2=(
+            triangulation.image_points2
+        ),
+    )
+
+    error_before = (
+        compute_pairwise_reprojection_error(
+            problem,
+            CAMERA_MATRIX,
+        )
+    )
+
+    optimized_problem = (
+        bundle_adjustment.optimize(
+            problem
+        )
+    )
+
+    error_after = (
+        compute_pairwise_reprojection_error(
+            optimized_problem,
+            CAMERA_MATRIX,
+        )
+    )
+
+    print(
+        f"Pair: "
+        f"{frame1.filename} -> "
+        f"{frame2.filename}"
+    )
+
+    print(
+        f"Points: "
+        f"{len(optimized_problem.points_3d)}"
+    )
+
+    print(
+        f"Reprojection error before BA: "
+        f"{error_before:.4f} px"
+    )
+
+    print(
+        f"Reprojection error after BA:  "
+        f"{error_after:.4f} px"
+    )
+
+    if not np.isfinite(error_before):
+        raise RuntimeError(
+            "Initial reprojection error is not finite."
+        )
+
+    if not np.isfinite(error_after):
+        raise RuntimeError(
+            "Optimized reprojection error is not finite."
+        )
+
+    if error_after > error_before:
+        raise RuntimeError(
+            "Bundle Adjustment increased the "
+            "reprojection error."
+        )
+
+    point_cloud = PointCloud(
+        points=optimized_problem.points_3d,
+        colors=triangulation.point_cloud.colors,
+    )
+
+    Visualizer.show_point_cloud(
+        point_cloud
+    )
+
+# Helpers
+
+def prepare_test_pair():
+    """
+    Prepares the first image pair for reconstruction tests.
+
+    Returns
+    -------
+    tuple
+        The two frames and the estimated MatchResult.
+    """
 
     frames = load_frames()
 
+    if len(frames) < 2:
+        raise RuntimeError(
+            "At least two frames are required."
+        )
 
     detector = FeatureDetector()
     matcher = FeatureMatcher()
     estimator = PoseEstimator()
-    triangulator = Triangulator()
-    track_builder = TrackBuilder()
-    landmark_manager = LandmarkManager()
 
+    frame1 = frames[0]
+    frame2 = frames[1]
 
-    reconstructor = Reconstructor(
-        triangulator,
-        track_builder,
-        landmark_manager,
+    detector.detect(frame1)
+    detector.detect(frame2)
+
+    result = matcher.match(
+        frame1,
+        frame2,
     )
 
+    estimator.estimate(
+        result,
+        CAMERA_MATRIX,
+    )
 
-    previous_frame = None
-
-
-    for frame in frames:
-
-        detector.detect(frame)
-
-
-        if previous_frame is None:
-
-            previous_frame = frame
-            continue
-
-
-        result = matcher.match(
-            previous_frame,
-            frame,
+    if result.rotation is None:
+        raise RuntimeError(
+            "Pose estimation did not produce a rotation."
         )
 
-
-        estimator.estimate(
-            result,
-            CAMERA_MATRIX,
+    if result.translation is None:
+        raise RuntimeError(
+            "Pose estimation did not produce a translation."
         )
 
-
-        reconstructor.update_pair(
-            result,
-            CAMERA_MATRIX,
+    if result.ransac_mask is None:
+        raise RuntimeError(
+            "RANSAC did not produce a valid mask."
         )
 
+    if result.inlier_matches is None:
+        raise RuntimeError(
+            "Pose estimation did not produce inlier matches."
+        )
 
-        previous_frame = frame
+    if len(result.inlier_matches) == 0:
+        raise RuntimeError(
+            "Pose estimation produced no inlier matches."
+        )
 
+    return frame1, frame2, result
 
-    return reconstructor.get_reconstruction()
-
-def print_reconstruction_summary(
-    reconstruction,
-):
-
-    print()
-    print("==========================")
-    print("RECONSTRUCTION SUMMARY")
-    print("==========================")
-
-
-    print(
-        "Cameras:",
-        len(reconstruction.camera_poses)
-    )
-
-
-    print(
-        "Landmarks:",
-        len(reconstruction.landmarks)
-    )
-
-    observations = [
-        len(lm.observations)
-        for lm in reconstruction.landmarks.values()
-    ]
-
-
-    print(
-        "Average observations per landmark:",
-        np.mean(observations)
-    )
-
-    print(
-        "Min observations:",
-        np.min(observations)
-    )
-
-    print(
-        "Max observations:",
-        np.max(observations)
-    )
-
-
-    print(
-        "Observations:",
-        sum(observations)
-    )
-
-
-    print("==========================")
-
-def compute_reprojection_errors(
-    reconstruction,
-    camera_matrix,
-):
+def compute_pairwise_reprojection_error(
+    problem: BAProblem,
+    camera_matrix: np.ndarray,
+) -> float:
     """
-    Computes reprojection errors for all observations.
-
-    Returns:
-        np.ndarray containing one error per observation.
+    Computes the mean reprojection error for
+    a pairwise reconstruction.
     """
 
-    errors = []
+    points = problem.points_3d
 
-    frame_errors = {}
+    projected1, _ = cv2.projectPoints(
+        points,
+        np.zeros((3, 1)),
+        np.zeros((3, 1)),
+        camera_matrix,
+        None,
+    )
 
+    projected2, _ = cv2.projectPoints(
+        points,
+        problem.rotation,
+        problem.translation.reshape(3, 1),
+        camera_matrix,
+        None,
+    )
 
-    camera_lookup = {
-        camera_id: frame_name
-        for frame_name, camera_id
-        in reconstruction.camera_ids.items()
-    }
+    projected1 = projected1.reshape(-1, 2)
+    projected2 = projected2.reshape(-1, 2)
 
+    errors1 = np.linalg.norm(
+        projected1 - problem.image_points1,
+        axis=1,
+    )
 
-    for landmark in reconstruction.landmarks.values():
+    errors2 = np.linalg.norm(
+        projected2 - problem.image_points2,
+        axis=1,
+    )
 
-        point = landmark.position.reshape(
-            1,
-            3,
+    return float(
+        np.mean(
+            np.concatenate(
+                (errors1, errors2)
+            )
         )
-
-
-        for observation in landmark.observations:
-
-
-            frame_name = camera_lookup.get(
-                observation.camera_id
-            )
-
-
-            if frame_name is None:
-                continue
-
-
-            pose = reconstruction.camera_poses[
-                frame_name
-            ]
-
-
-            R = pose.rotation
-            t = pose.translation
-
-
-            rvec, _ = cv2.Rodrigues(
-                R
-            )
-
-
-            projected, _ = cv2.projectPoints(
-                point,
-                rvec,
-                t,
-                camera_matrix,
-                None,
-            )
-
-
-            projected = projected.reshape(
-                2
-            )
-
-
-            error = np.linalg.norm(
-                projected
-                -
-                observation.image_point
-            )
-
-
-            errors.append(
-                error
-            )
-
-
-            frame_errors.setdefault(
-                frame_name,
-                []
-            ).append(
-                error
-            )
-
-
-    print()
-
-    print(
-        "=========================="
-    )
-
-    print(
-        "ERROR PER CAMERA"
-    )
-
-    print(
-        "=========================="
-    )
-
-
-    for frame_name in sorted(frame_errors):
-
-        values = np.asarray(
-            frame_errors[frame_name]
-        )
-
-
-        print(
-            f"{frame_name}: "
-            f"mean={values.mean():8.2f}px   "
-            f"median={np.median(values):8.2f}px   "
-            f"count={len(values)}"
-        )
-
-
-    print(
-        "=========================="
-    )
-
-
-    return np.asarray(
-        errors
-    )
-
-
-def print_error_statistics(
-    errors,
-    name,
-):
-    if len(errors) == 0:
-        print("No reprojection errors available")
-        return
-
-    print()
-    print("==========================")
-    print(name)
-    print("==========================")
-
-
-    print(
-        "Mean:",
-        np.mean(errors)
-    )
-
-    print(
-        "Median:",
-        np.median(errors)
-    )
-
-    print(
-        "95 percentile:",
-        np.percentile(errors,95)
-    )
-
-    print(
-        "Max:",
-        np.max(errors)
-    )
-
-    print("==========================")
-
-
-def _update_point_cloud_from_landmarks(
-    reconstruction,
-):
-    """
-    Updates point cloud positions after optimization.
-    """
-
-    if reconstruction.point_cloud is None:
-        return
-
-
-    points = []
-
-
-    for landmark in reconstruction.landmarks.values():
-
-        points.append(
-            landmark.position
-        )
-
-
-    reconstruction.point_cloud.points = np.asarray(
-        points
     )
 
 # Pipeline B: OpenMVG reconstruction
