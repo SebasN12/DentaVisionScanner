@@ -97,8 +97,6 @@ class DenseReconstructor:
         frame2 = result.frame2
 
         #
-        # IMPORTANT:
-        #
         # recoverPose gives:
         #
         #     X_camera2 = R * X_camera1 + t
@@ -106,7 +104,7 @@ class DenseReconstructor:
         # This transformation is passed directly to
         # stereoRectify.
         #
-        # Do NOT invert R and t.
+        # Do NOT invert R and t here.
         #
         rotation = result.rotation
 
@@ -295,55 +293,28 @@ class DenseReconstructor:
         )
 
         #
-        # OpenCV uses:
-        #
-        #     minDisparity - 1
-        #
-        # as the invalid disparity value.
+        # OpenCV uses minDisparity - 1 as the invalid
+        # disparity value.
         #
         invalid_disparity = (
             self.min_disparity - 1
         )
 
         #
-        # Accept only valid negative disparities.
+        # Accept valid disparities within the configured
+        # negative disparity range.
+        #
+        # With the current configuration:
+        #
+        #     -1024 < disparity <= -5
+        #
+        # Disparities close to zero are rejected because
+        # they correspond to unstable, very large depths.
         #
         valid_disparity = (
             np.isfinite(disparity)
             &
             (disparity != invalid_disparity)
-            &
-            (disparity <= -min_disparity)
-            &
-            (disparity <= -min_disparity)
-        )
-
-        #
-        # The previous expression above only establishes the
-        # upper bound. We explicitly require a negative
-        # disparity as well.
-        #
-        valid_disparity &= (
-            disparity < -min_disparity
-        )
-
-        #
-        # More importantly, reject values near zero.
-        #
-        valid_disparity &= (
-            disparity <= -min_disparity
-        )
-
-        #
-        # The actual valid interval is:
-        #
-        #     [-1024, -5]
-        #
-        # because disparities closer to zero produce unstable
-        # depth values.
-        #
-        valid_disparity = (
-            np.isfinite(disparity)
             &
             (disparity > self.min_disparity)
             &
@@ -361,9 +332,9 @@ class DenseReconstructor:
         valid = (
             valid_disparity
             &
-            np.isfinite(points_3d).all(
-                axis=2
-            )
+            np.isfinite(
+                points_3d
+            ).all(axis=2)
         )
 
         points = points_3d[
@@ -379,48 +350,6 @@ class DenseReconstructor:
             colors.astype(np.float32)
             / 255.0
         )
-
-        #
-        # Debug disparity statistics.
-        #
-        total_pixels = disparity.size
-
-        valid_count = np.count_nonzero(
-            valid_disparity
-        )
-
-        print(
-            f"Stereo resolution: "
-            f"{stereo_width} x {stereo_height}"
-        )
-
-        print(
-            f"Dense stereo pixels: "
-            f"{total_pixels}"
-        )
-
-        print(
-            f"Valid disparity pixels: "
-            f"{valid_count} "
-            f"({valid_count / total_pixels * 100:.2f}%)"
-        )
-
-        if valid_count > 0:
-
-            valid_disparities = disparity[
-                valid_disparity
-            ]
-
-            print(
-                f"Valid disparity percentiles: "
-                f"P1={np.percentile(valid_disparities, 1):.2f}, "
-                f"P10={np.percentile(valid_disparities, 10):.2f}, "
-                f"P25={np.percentile(valid_disparities, 25):.2f}, "
-                f"P50={np.percentile(valid_disparities, 50):.2f}, "
-                f"P75={np.percentile(valid_disparities, 75):.2f}, "
-                f"P90={np.percentile(valid_disparities, 90):.2f}, "
-                f"P99={np.percentile(valid_disparities, 99):.2f}"
-            )
 
         if len(points) == 0:
             raise RuntimeError(
@@ -479,14 +408,40 @@ class DenseReconstructor:
             )
 
         #
-        # Final depth statistics.
+        # Final statistics.
         #
         final_depths = points[:, 2]
+
+        total_pixels = disparity.size
+
+        valid_disparity_count = np.count_nonzero(
+            valid_disparity
+        )
+
+        valid_point_count = np.count_nonzero(
+            valid
+        )
+
+        print(
+            f"Stereo resolution: "
+            f"{stereo_width} x {stereo_height}"
+        )
+
+        print(
+            f"Dense stereo pixels: "
+            f"{total_pixels}"
+        )
+
+        print(
+            f"Valid disparity pixels: "
+            f"{valid_disparity_count} "
+            f"({valid_disparity_count / total_pixels * 100:.2f}%)"
+        )
 
         print(
             f"Depth-filtered points: "
             f"{len(points)} / "
-            f"{valid_count}"
+            f"{valid_point_count}"
         )
 
         print(
@@ -499,6 +454,29 @@ class DenseReconstructor:
             f"{mad:.4f}"
         )
 
+        #
+        # Disparity distribution.
+        #
+        valid_disparities = disparity[
+            valid_disparity
+        ]
+
+        if len(valid_disparities) > 0:
+
+            print(
+                f"Valid disparity percentiles: "
+                f"P1={np.percentile(valid_disparities, 1):.2f}, "
+                f"P10={np.percentile(valid_disparities, 10):.2f}, "
+                f"P25={np.percentile(valid_disparities, 25):.2f}, "
+                f"P50={np.percentile(valid_disparities, 50):.2f}, "
+                f"P75={np.percentile(valid_disparities, 75):.2f}, "
+                f"P90={np.percentile(valid_disparities, 90):.2f}, "
+                f"P99={np.percentile(valid_disparities, 99):.2f}"
+            )
+
+        #
+        # Final depth distribution.
+        #
         print(
             f"Final depth percentiles: "
             f"P1={np.percentile(final_depths, 1):.4f}, "
@@ -509,6 +487,192 @@ class DenseReconstructor:
             f"P90={np.percentile(final_depths, 90):.4f}, "
             f"P99={np.percentile(final_depths, 99):.4f}"
         )
+
+        #
+        # Spatial distribution.
+        #
+        final_valid_mask = np.zeros(
+            valid.shape,
+            dtype=bool,
+        )
+
+        valid_indices = np.flatnonzero(
+            valid
+        )
+
+        final_indices = valid_indices[
+            depth_mask
+        ]
+
+        final_valid_mask.flat[
+            final_indices
+        ] = True
+
+        height, width = disparity.shape
+
+        center_x = width / 2.0
+        center_y = height / 2.0
+
+        ys, xs = np.where(
+            final_valid_mask
+        )
+
+        if len(xs) > 0:
+
+            left_ratio = np.mean(
+                xs < center_x
+            )
+
+            right_ratio = np.mean(
+                xs >= center_x
+            )
+
+            top_ratio = np.mean(
+                ys < center_y
+            )
+
+            bottom_ratio = np.mean(
+                ys >= center_y
+            )
+
+            print(
+                f"Spatial distribution: "
+                f"left={left_ratio * 100:.2f}%, "
+                f"right={right_ratio * 100:.2f}%, "
+                f"top={top_ratio * 100:.2f}%, "
+                f"bottom={bottom_ratio * 100:.2f}%"
+            )
+
+            print(
+                f"Final image coverage: "
+                f"x={xs.min()} -> {xs.max()}, "
+                f"y={ys.min()} -> {ys.max()}"
+            )
+
+        #
+        # 4x4 spatial occupancy.
+        #
+        grid_rows = 4
+        grid_cols = 4
+
+        grid_counts = np.zeros(
+            (grid_rows, grid_cols),
+            dtype=int,
+        )
+
+        if len(xs) > 0:
+
+            grid_x = np.minimum(
+                (
+                    xs
+                    * grid_cols
+                    / width
+                ).astype(int),
+                grid_cols - 1,
+            )
+
+            grid_y = np.minimum(
+                (
+                    ys
+                    * grid_rows
+                    / height
+                ).astype(int),
+                grid_rows - 1,
+            )
+
+            for gy, gx in zip(
+                grid_y,
+                grid_x,
+            ):
+                grid_counts[
+                    gy,
+                    gx
+                ] += 1
+
+            print(
+                "4x4 spatial occupancy:"
+            )
+
+            for row in grid_counts:
+
+                print(
+                    " ".join(
+                        f"{value:7d}"
+                        for value in row
+                    )
+                )
+
+        #
+        # Median depth per spatial cell.
+        #
+        grid_depths = np.full(
+            (grid_rows, grid_cols),
+            np.nan,
+            dtype=np.float64,
+        )
+
+        if len(xs) > 0:
+
+            for gy in range(
+                grid_rows
+            ):
+
+                for gx in range(
+                    grid_cols
+                ):
+
+                    cell_mask = (
+                        (grid_y == gy)
+                        &
+                        (grid_x == gx)
+                    )
+
+                    if np.any(cell_mask):
+
+                        grid_depths[
+                            gy,
+                            gx
+                        ] = np.median(
+                            final_depths[
+                                cell_mask
+                            ]
+                        )
+
+            print(
+                "4x4 median depth:"
+            )
+
+            for row in grid_depths:
+
+                print(
+                    " ".join(
+                        f"{value:8.3f}"
+                        if np.isfinite(value)
+                        else "     nan"
+                        for value in row
+                    )
+                )
+
+        #
+        # Image-depth correlation.
+        #
+        if len(xs) > 1:
+
+            x_correlation = np.corrcoef(
+                xs,
+                final_depths,
+            )[0, 1]
+
+            y_correlation = np.corrcoef(
+                ys,
+                final_depths,
+            )[0, 1]
+
+            print(
+                f"Image-depth correlation: "
+                f"corr(x,z)={x_correlation:.4f}, "
+                f"corr(y,z)={y_correlation:.4f}"
+            )
 
         #
         # Final 3D ranges.
@@ -531,23 +695,6 @@ class DenseReconstructor:
         #
         # Visualization.
         #
-        final_valid_mask = np.zeros(
-            valid.shape,
-            dtype=bool,
-        )
-
-        valid_indices = np.flatnonzero(
-            valid
-        )
-
-        final_indices = valid_indices[
-            depth_mask
-        ]
-
-        final_valid_mask.flat[
-            final_indices
-        ] = True
-
         overlay = rectified1.copy()
 
         overlay[
