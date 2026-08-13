@@ -221,6 +221,7 @@ reconstruction/
 ```
 The internal structure of `src/` and `src_v2/` are currently documented below for reference:
 
+<!-- TODO: update this structure-->
 ```
 src/
     │

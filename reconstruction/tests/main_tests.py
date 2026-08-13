@@ -10,7 +10,6 @@ from src.pipeline.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 from src.io.point_cloud_writer import PointCloudWriter
 from src.optimization.bundle_adjustment import BundleAdjustment
-from src.core.reconstruction import Reconstruction
 from src.optimization.ba_problem import BAProblem
 from src.core.point_cloud import PointCloud
 
@@ -26,7 +25,7 @@ from src.config.paths import (
     FEATURES_OUTPUT,
     MATCHES_OUTPUT,
     INLIERS_OUTPUT,
-    RECONSTRUCTION_OUTPUT_FILE,
+    RECONSTRUCTION_OUTPUT,
 )
 
 
@@ -292,6 +291,130 @@ def test_pairwise_reconstruction():
 
     Visualizer.show_point_cloud(
         point_cloud
+    )
+
+def test_pairwise_reconstruction_sequence():
+    """
+    Tests pairwise reconstruction over the first 20 frames.
+
+    The test simulates the sequential processing of consecutive
+    image pairs:
+
+        Frame 0 + Frame 1
+        Frame 1 + Frame 2
+        ...
+        Frame 18 + Frame 19
+
+    Each pair is reconstructed independently.
+    """
+
+    frames = load_frames()
+
+    if len(frames) < 20:
+        raise RuntimeError(
+            "At least 20 frames are required."
+        )
+
+    frames = frames[:20]
+
+    detector = FeatureDetector()
+    matcher = FeatureMatcher()
+    estimator = PoseEstimator()
+
+    triangulator = Triangulator()
+
+    bundle_adjustment = BundleAdjustment(
+        CAMERA_MATRIX
+    )
+
+    reconstructor = Reconstructor(
+        triangulator,
+        bundle_adjustment,
+    )
+
+    print(
+        f"Loaded {len(frames)} frames for "
+        f"pairwise reconstruction."
+    )
+
+    print(
+        f"Processing {len(frames) - 1} consecutive pairs.\n"
+    )
+
+    reconstructed_clouds = []
+
+    for i in range(len(frames) - 1):
+
+        frame1 = frames[i]
+        frame2 = frames[i + 1]
+
+        detector.detect(frame1)
+        detector.detect(frame2)
+
+        result = matcher.match(
+            frame1,
+            frame2,
+        )
+
+        estimator.estimate(
+            result,
+            CAMERA_MATRIX,
+        )
+
+        if (
+            result.rotation is None
+            or result.translation is None
+        ):
+            raise RuntimeError(
+                f"Pose estimation failed for pair "
+                f"{i}."
+            )
+
+        point_cloud, _, _ = (
+            reconstructor.reconstruct(
+                result,
+                CAMERA_MATRIX,
+            )
+        )
+
+        if len(point_cloud.points) == 0:
+            raise RuntimeError(
+                f"Pair {i} produced no reconstructed points."
+            )
+
+        if not np.all(
+            np.isfinite(point_cloud.points)
+        ):
+            raise RuntimeError(
+                f"Pair {i} produced non-finite points."
+            )
+        
+        output_path = (
+            RECONSTRUCTION_OUTPUT
+            / f"pair_{i:03d}.ply"
+        )
+
+        saved_path = PointCloudWriter.write_ply(
+            point_cloud,
+            output_path,
+        )
+
+        print(
+            f"  Saved: {saved_path}"
+        )
+
+        reconstructed_clouds.append(
+            point_cloud
+        )
+
+        print(
+            f"Pair {i + 1}/{len(frames) - 1}: "
+            f"{len(point_cloud.points)} points"
+        )
+
+    print(
+        f"\nPairwise reconstruction completed: "
+        f"{len(reconstructed_clouds)} point clouds."
     )
 
 def test_pairwise_bundle_adjustment():

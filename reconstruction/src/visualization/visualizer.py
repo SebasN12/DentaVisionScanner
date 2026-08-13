@@ -8,12 +8,6 @@ from src.core.match_result import MatchResult
 from src.core.point_cloud import PointCloud
 
 
-#temporary
-
-import numpy as np
-
-#/temporary
-
 class Visualizer:
 
     @staticmethod
@@ -156,19 +150,6 @@ class Visualizer:
             raise ValueError(
                 f"PLY file contains no points: {ply_path}"
             )
-        
-        colors = np.asarray(cloud.colors)
-
-        unique_colors, counts = np.unique(
-            colors,
-            axis=0,
-            return_counts=True
-        )
-
-        print("Number of different colors:", len(unique_colors))
-
-        for color, count in zip(unique_colors[:10], counts[:10]):
-            print(color, count)
 
         o3d.visualization.draw_geometries(
             [cloud],

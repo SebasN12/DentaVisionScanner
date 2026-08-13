@@ -23,7 +23,9 @@ def main():
 
     # tests.test_pairwise_reconstruction()
 
-    tests.test_pairwise_bundle_adjustment()
+    tests.test_pairwise_reconstruction_sequence()
+
+    # tests.test_pairwise_bundle_adjustment()
 
 
     # Pipeline B: OpenMVG reconstruction
@@ -32,7 +34,7 @@ def main():
 
     # visualizer.show_ply(Path("C:\dev\openMVG_test\output\sfm\colored_cloud.ply"))
 
-    # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "point_cloud.ply")
+    # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "pair_015.ply")
 
     # tests.test_openmvg_sparse_pipeline()
 
