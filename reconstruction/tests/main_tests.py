@@ -12,6 +12,7 @@ from src.io.point_cloud_writer import PointCloudWriter
 from src.optimization.bundle_adjustment import BundleAdjustment
 from src.optimization.ba_problem import BAProblem
 from src.core.point_cloud import PointCloud
+from src.pipeline.dense_reconstruction import DenseReconstructor
 
 
 from src_v2.reconstruction.openmvg import OpenMVG
@@ -556,6 +557,70 @@ def test_pairwise_bundle_adjustment():
     point_cloud = PointCloud(
         points=optimized_problem.points_3d,
         colors=triangulation.point_cloud.colors,
+    )
+
+    Visualizer.show_point_cloud(
+        point_cloud
+    )
+
+def test_dense_reconstruction():
+    """
+    Tests dense stereo reconstruction for a single image pair.
+    """
+
+    frame1, frame2, result = prepare_test_pair()
+
+    reconstructor = DenseReconstructor(
+        CAMERA_MATRIX
+    )
+
+    point_cloud = reconstructor.reconstruct(result)
+
+    if len(point_cloud.points) == 0:
+        raise RuntimeError(
+            "Dense reconstruction produced no points."
+        )
+
+    if not np.all(
+        np.isfinite(point_cloud.points)
+    ):
+        raise RuntimeError(
+            "Dense reconstruction produced "
+            "non-finite points."
+        )
+
+    print(
+        f"Pair: "
+        f"{frame1.filename} -> "
+        f"{frame2.filename}"
+    )
+
+    print(
+        f"Dense points: "
+        f"{len(point_cloud.points)}"
+    )
+
+    print(
+        f"X range: "
+        f"{point_cloud.points[:, 0].min():.4f} -> "
+        f"{point_cloud.points[:, 0].max():.4f}"
+    )
+
+    print(
+        f"Y range: "
+        f"{point_cloud.points[:, 1].min():.4f} -> "
+        f"{point_cloud.points[:, 1].max():.4f}"
+    )
+
+    print(
+        f"Z range: "
+        f"{point_cloud.points[:, 2].min():.4f} -> "
+        f"{point_cloud.points[:, 2].max():.4f}"
+    )
+
+    print(
+        f"Translation norm: "
+        f"{np.linalg.norm(result.translation):.6f}"
     )
 
     Visualizer.show_point_cloud(
