@@ -23,9 +23,9 @@ def main():
 
     # tests.test_pairwise_reconstruction()
 
-    tests.test_pairwise_reconstruction_sequence()
+    # tests.test_pairwise_reconstruction_sequence()
 
-    # tests.test_pairwise_bundle_adjustment()
+    tests.test_pairwise_bundle_adjustment()
 
 
     # Pipeline B: OpenMVG reconstruction

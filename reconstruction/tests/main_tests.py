@@ -216,22 +216,15 @@ def test_pairwise_reconstruction():
             ↓
         Triangulation
             ↓
-        Pairwise Bundle Adjustment
-            ↓
-        Optimized Point Cloud
+        Sparse Point Cloud
     """
 
     frame1, frame2, result = prepare_test_pair()
 
     triangulator = Triangulator()
 
-    bundle_adjustment = BundleAdjustment(
-        CAMERA_MATRIX
-    )
-
     reconstructor = Reconstructor(
-        triangulator,
-        bundle_adjustment,
+        triangulator
     )
 
     print(
@@ -323,13 +316,8 @@ def test_pairwise_reconstruction_sequence():
 
     triangulator = Triangulator()
 
-    bundle_adjustment = BundleAdjustment(
-        CAMERA_MATRIX
-    )
-
     reconstructor = Reconstructor(
         triangulator,
-        bundle_adjustment,
     )
 
     print(
@@ -419,8 +407,11 @@ def test_pairwise_reconstruction_sequence():
 
 def test_pairwise_bundle_adjustment():
     """
-    Tests pairwise triangulation and Bundle Adjustment.
+    Evaluates pairwise Bundle Adjustment in terms of
+    reprojection error and execution time.
     """
+
+    import time
 
     frame1, frame2, result = prepare_test_pair()
 
@@ -430,6 +421,9 @@ def test_pairwise_bundle_adjustment():
         CAMERA_MATRIX
     )
 
+    #
+    # Triangulation
+    #
     triangulation = triangulator.triangulate(
         result,
         CAMERA_MATRIX,
@@ -456,6 +450,9 @@ def test_pairwise_bundle_adjustment():
         ),
     )
 
+    #
+    # Reprojection error before BA
+    #
     error_before = (
         compute_pairwise_reprojection_error(
             problem,
@@ -463,18 +460,64 @@ def test_pairwise_bundle_adjustment():
         )
     )
 
+    if not np.isfinite(error_before):
+        raise RuntimeError(
+            "Initial reprojection error is not finite."
+        )
+
+    #
+    # Bundle Adjustment
+    #
+    start_time = time.perf_counter()
+
     optimized_problem = (
         bundle_adjustment.optimize(
             problem
         )
     )
 
+    ba_time = (
+        time.perf_counter()
+        - start_time
+    )
+
+    #
+    # Reprojection error after BA
+    #
     error_after = (
         compute_pairwise_reprojection_error(
             optimized_problem,
             CAMERA_MATRIX,
         )
     )
+
+    if not np.isfinite(error_after):
+        raise RuntimeError(
+            "Optimized reprojection error is not finite."
+        )
+
+    if error_after > error_before:
+        raise RuntimeError(
+            "Bundle Adjustment increased the "
+            "reprojection error."
+        )
+
+    #
+    # Improvement
+    #
+    if error_before > 0:
+        improvement = (
+            (error_before - error_after)
+            / error_before
+            * 100.0
+        )
+    else:
+        improvement = 0.0
+
+    #
+    # Results
+    #
+    print()
 
     print(
         f"Pair: "
@@ -497,22 +540,19 @@ def test_pairwise_bundle_adjustment():
         f"{error_after:.4f} px"
     )
 
-    if not np.isfinite(error_before):
-        raise RuntimeError(
-            "Initial reprojection error is not finite."
-        )
+    print(
+        f"Reprojection error improvement: "
+        f"{improvement:.2f}%"
+    )
 
-    if not np.isfinite(error_after):
-        raise RuntimeError(
-            "Optimized reprojection error is not finite."
-        )
+    print(
+        f"Bundle Adjustment time: "
+        f"{ba_time:.2f} s"
+    )
 
-    if error_after > error_before:
-        raise RuntimeError(
-            "Bundle Adjustment increased the "
-            "reprojection error."
-        )
-
+    #
+    # Visualize optimized result
+    #
     point_cloud = PointCloud(
         points=optimized_problem.points_3d,
         colors=triangulation.point_cloud.colors,
