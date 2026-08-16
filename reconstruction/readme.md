@@ -221,7 +221,6 @@ reconstruction/
 ```
 The internal structure of `src/` and `src_v2/` are currently documented below for reference:
 
-<!-- TODO: update this structure-->
 ```
 src/
     │
@@ -229,29 +228,39 @@ src/
     │
     ├── config/
     │   ├── __init__.py
-    │   ├── settings.py
+    │   ├── camera.py
+    │   ├── paths.py
+    │   └── settings.py
     │
     ├── core/
     │   ├── __init__.py
     │   ├── frame.py
     │   ├── match_result.py
-    │   └── reconstruction.py
+    │   ├── point_cloud.py
+    │   └── triangulation_result.py
+    │
+    ├── io/
+    │   ├── __init__.py
+    │   └── point_cloud_writer.py
+    │
+    ├── optimization/
+    │   ├── __init__.py
+    │   ├── ba_problem.py
+    │   └── bundle_adjustment.py
     │
     ├── pipeline/
     │   ├── __init__.py
     │   ├── camera.py
+    │   ├── dense_reconstruction.py
     │   ├── features.py
     │   ├── matching.py
     │   ├── pose.py
-    │   ├── triangulation.py
-    │   └── pointcloud.py
+    │   ├── reconstructor.py
+    │   └── triangulation.py
     │
-    ├── visualization/
-    │   ├── __init__.py
-    │   └── visualizer.py
-    │
-    └── utils/
-        └── __init__.py
+    └── visualization/
+        ├── __init__.py
+        └── visualizer.py
 ```
 ---
 

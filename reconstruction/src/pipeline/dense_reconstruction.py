@@ -104,8 +104,6 @@ class DenseReconstructor:
         # This transformation is passed directly to
         # stereoRectify.
         #
-        # Do NOT invert R and t here.
-        #
         rotation = result.rotation
 
         translation = (
@@ -185,7 +183,7 @@ class DenseReconstructor:
         )
 
         #
-        # Debug information about the stereo geometry.
+        # Stereo geometry statistics.
         #
         baseline = np.linalg.norm(
             translation
@@ -301,15 +299,13 @@ class DenseReconstructor:
         )
 
         #
-        # Accept valid disparities within the configured
-        # negative disparity range.
-        #
-        # With the current configuration:
+        # With the current stereo configuration, valid
+        # disparities lie in:
         #
         #     -1024 < disparity <= -5
         #
-        # Disparities close to zero are rejected because
-        # they correspond to unstable, very large depths.
+        # Disparities close to zero are rejected because they
+        # produce unstable, very large depth values.
         #
         valid_disparity = (
             np.isfinite(disparity)
@@ -584,6 +580,7 @@ class DenseReconstructor:
                 grid_y,
                 grid_x,
             ):
+
                 grid_counts[
                     gy,
                     gx
@@ -691,27 +688,6 @@ class DenseReconstructor:
             f"Translation norm: "
             f"{np.linalg.norm(translation):.6f}"
         )
-
-        #
-        # Visualization.
-        #
-        overlay = rectified1.copy()
-
-        overlay[
-            final_valid_mask
-        ] = (
-            0,
-            255,
-            0,
-        )
-
-        cv2.imshow(
-            "Dense Valid Points",
-            overlay,
-        )
-
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
 
         return PointCloud(
             points=points,

@@ -1,4 +1,6 @@
-import tests.main_tests as tests
+import tests.modules_tests as module
+import tests.pair_tests as pair
+import tests.sfm_tests as sfm
 from src.visualization.visualizer import Visualizer
 from pathlib import Path
 from src.config.paths import OUTPUT_PATH
@@ -9,25 +11,25 @@ def main():
 
     # Pipeline A: pairwise reconstruction with OpenCV
 
-    # tests.load_frames()
+    # module.load_frames()
 
-    # tests.test_camera()
+    # module.test_camera()
 
-    # tests.test_features()
+    # module.test_features()
 
-    # tests.test_matching()
+    # module.test_matching()
 
-    # tests.test_pose()
+    # module.test_pose()
 
-    # tests.test_triangulation()
+    # module.test_triangulation()
 
-    # tests.test_pairwise_reconstruction()
+    # pair.test_pairwise_reconstruction()
 
-    # tests.test_pairwise_reconstruction_sequence()
+    # pair.test_pairwise_reconstruction_sequence()
 
-    # tests.test_pairwise_bundle_adjustment()
+    # module.test_pairwise_bundle_adjustment()
 
-    tests.test_dense_reconstruction()
+    pair.test_dense_reconstruction()
 
 
     # Pipeline B: OpenMVG reconstruction
@@ -38,11 +40,11 @@ def main():
 
     # visualizer.show_ply(OUTPUT_PATH / "reconstruction" / "pair_015.ply")
 
-    # tests.test_openmvg_sparse_pipeline()
+    # sfm.test_openmvg_sparse_pipeline()
 
-    # tests.test_openmvs_prepare_dense()
+    # sfm.test_openmvs_prepare_dense()
 
-    # tests.test_openmvs_dense_pipeline()
+    # sfm.test_openmvs_dense_pipeline()
 
 
 
