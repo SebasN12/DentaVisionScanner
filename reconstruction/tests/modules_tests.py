@@ -1,23 +1,16 @@
 import cv2
 import numpy as np
 
-from src.pipeline.reconstructor import Reconstructor
 from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
 from src.pipeline.matching import FeatureMatcher
 from src.pipeline.pose import PoseEstimator
 from src.pipeline.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
-from src.io.point_cloud_writer import PointCloudWriter
 from src.optimization.bundle_adjustment import BundleAdjustment
 from src.optimization.ba_problem import BAProblem
 from src.core.point_cloud import PointCloud
-from src.pipeline.dense_reconstruction import DenseReconstructor
 
-
-from src_v2.reconstruction.openmvg import OpenMVG
-from src_v2.reconstruction.openmvs import OpenMVS
-from src_v2.reconstruction.pipeline import ReconstructionPipeline
 
 from src.config.camera import CAMERA_MATRIX
 
@@ -26,23 +19,22 @@ from src.config.paths import (
     FEATURES_OUTPUT,
     MATCHES_OUTPUT,
     INLIERS_OUTPUT,
-    RECONSTRUCTION_OUTPUT,
 )
 
 # Pipeline A: pairwise reconstruction with OpenCV
 
-def load_frames():
+def test_load_single_frame():
 
     camera = Camera(DATASET_PATH)
 
-    frames = camera.load_frames()
+    frame_name = "DJI_0042.JPG"
 
-    print(
-        f"Loaded {len(frames)} frames.\n"
-    )
+    frame = camera.load_frame(frame_name)
 
-    return frames
-
+    print("Frame data:")
+    print(frame.filename)
+    print(frame.path)
+    print(frame.image)
 
 def test_camera():
 
@@ -360,30 +352,56 @@ def test_pairwise_bundle_adjustment():
     )
 
 # Helpers
+def load_frames():
 
-def prepare_test_pair():
+    camera = Camera(DATASET_PATH)
+
+    frames = camera.load_frames()
+
+    print(
+        f"Loaded {len(frames)} frames.\n"
+    )
+
+    return frames
+
+def prepare_test_pair(frame_name1: str | None = None, frame_name2: str | None = None):
     """
-    Prepares the first image pair for reconstruction tests.
+    Prepares an image pair for reconstruction tests.
 
-    Returns
-    -------
-    tuple
-        The two frames and the estimated MatchResult.
+    If no frame names are provided, the first two frames
+    loaded from the dataset are used.
+
+    If frame names are provided, those two images are loaded
+    explicitly.
     """
 
-    frames = load_frames()
-
-    if len(frames) < 2:
-        raise RuntimeError(
-            "At least two frames are required."
+    if (frame_name1 is None) != (frame_name2 is None):
+        raise ValueError(
+            "Both frame names must be provided, or both must be None."
         )
+
+    if frame_name1 is None and frame_name2 is None:
+
+        frames = load_frames()
+
+        if len(frames) < 2:
+            raise RuntimeError(
+                "At least two frames are required."
+            )
+        
+        frame1 = frames[0]
+        frame2 = frames[1]
+        
+    else:
+        camera = Camera(DATASET_PATH)
+
+        frame1 = camera.load_frame(frame_name1)
+
+        frame2 = camera.load_frame(frame_name2)
 
     detector = FeatureDetector()
     matcher = FeatureMatcher()
     estimator = PoseEstimator()
-
-    frame1 = frames[0]
-    frame2 = frames[1]
 
     detector.detect(frame1)
     detector.detect(frame2)
@@ -424,6 +442,8 @@ def prepare_test_pair():
         )
 
     return frame1, frame2, result
+
+
 
 def compute_pairwise_reprojection_error(
     problem: BAProblem,

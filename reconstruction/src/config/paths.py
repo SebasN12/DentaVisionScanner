@@ -2,7 +2,21 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset"
+# desert dataset
+# DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset"
+
+# middlebury dataset
+# # midd1
+# DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset" / "middlebury" / "Midd1"
+
+# # midd2
+# DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset" / "middlebury" / "Midd2"
+
+# # Monopoly
+# DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset" / "middlebury" / "Monopoly"
+
+# # Plastic
+DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset" / "middlebury" / "Plastic"
 
 OUTPUT_PATH = PROJECT_ROOT / "output"
 

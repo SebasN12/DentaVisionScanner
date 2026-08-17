@@ -13,16 +13,16 @@ env/
 .idea/
 
 # Generated outputs
-openCV/output/*
-!openCV/output/.gitkeep
+reconstruction/output/*
+!reconstruction/output/.gitkeep
 
 # Raw captured images
-openCV/data/images/*
-!openCV/data/images/.gitkeep
+reconstruction/data/images/*
+!reconstruction/data/images/.gitkeep
 
 # Calibration results
-openCV/data/calibration/*
-!openCV/data/calibration/.gitkeep
+reconstruction/data/calibration/*
+!reconstruction/data/calibration/.gitkeep
 
 # 3D files
 *.ply

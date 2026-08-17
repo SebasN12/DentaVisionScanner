@@ -49,10 +49,13 @@ class Camera:
 
         return sorted(image_paths)
 
-    def load_frame(self, image_path: Path) -> Frame:
+    def load_frame(self, image_name: str) -> Frame:
         """
         Loads a single image and returns it as a Frame.
         """
+
+        image_path = self.image_directory / image_name
+
 
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
 

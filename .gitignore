@@ -42,6 +42,9 @@ reconstruction/output/
 reconstruction/data/images/
 !reconstruction/data/images/.gitkeep
 
+# test datasets
+reconstruction/data/test_dataset/middlebury/*
+
 # Calibration files
 reconstruction/data/calibration/
 !reconstruction/data/calibration/.gitkeep

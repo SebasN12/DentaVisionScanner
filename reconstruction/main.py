@@ -11,6 +11,8 @@ def main():
 
     # Pipeline A: pairwise reconstruction with OpenCV
 
+    # module.test_load_single_frame()
+
     # module.load_frames()
 
     # module.test_camera()
@@ -23,13 +25,13 @@ def main():
 
     # module.test_triangulation()
 
-    # pair.test_pairwise_reconstruction()
+    pair.test_pairwise_reconstruction()
 
     # pair.test_pairwise_reconstruction_sequence()
 
     # module.test_pairwise_bundle_adjustment()
 
-    pair.test_dense_reconstruction()
+    # pair.test_dense_reconstruction()
 
 
     # Pipeline B: OpenMVG reconstruction

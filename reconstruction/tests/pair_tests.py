@@ -1,29 +1,18 @@
-import cv2
 import numpy as np
 
 from src.pipeline.reconstructor import Reconstructor
-from src.pipeline.camera import Camera
 from src.pipeline.features import FeatureDetector
 from src.pipeline.matching import FeatureMatcher
 from src.pipeline.pose import PoseEstimator
 from src.pipeline.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 from src.io.point_cloud_writer import PointCloudWriter
-from src.optimization.bundle_adjustment import BundleAdjustment
-from src.optimization.ba_problem import BAProblem
-from src.core.point_cloud import PointCloud
 from src.pipeline.dense_reconstruction import DenseReconstructor
 from tests.modules_tests import prepare_test_pair, load_frames
 
 from src.config.camera import CAMERA_MATRIX
 
-from src.config.paths import (
-    DATASET_PATH,
-    FEATURES_OUTPUT,
-    MATCHES_OUTPUT,
-    INLIERS_OUTPUT,
-    RECONSTRUCTION_OUTPUT,
-)
+from src.config.paths import RECONSTRUCTION_OUTPUT
 
 def test_pairwise_reconstruction():
     """
@@ -42,12 +31,21 @@ def test_pairwise_reconstruction():
         Sparse Point Cloud
     """
 
-    frame1, frame2, result = prepare_test_pair()
+    # frame1, frame2, result = prepare_test_pair()
+
+    frame1, frame2, result = prepare_test_pair(frame_name1="view1.png", frame_name2="view5.png")
 
     triangulator = Triangulator()
 
     reconstructor = Reconstructor(
         triangulator
+    )
+
+    inlier_ratio = (
+        len(result.inlier_matches)
+        / len(result.good_matches)
+        if result.good_matches
+        else 0.0
     )
 
     print(
@@ -57,8 +55,28 @@ def test_pairwise_reconstruction():
     )
 
     print(
-        f"Inlier matches: "
+        f"Image 1 keypoints: "
+        f"{len(frame1.keypoints)}"
+    )
+
+    print(
+        f"Image 2 keypoints: "
+        f"{len(frame2.keypoints)}"
+    )
+
+    print(
+        f"Good matches: "
+        f"{len(result.good_matches)}"
+    )
+
+    print(
+        f"RANSAC inliers: "
         f"{len(result.inlier_matches)}"
+    )
+
+    print(
+        f"Inlier ratio: "
+        f"{inlier_ratio * 100:.2f}%"
     )
 
     (
