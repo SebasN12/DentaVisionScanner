@@ -1,16 +1,16 @@
 import numpy as np
 
-from src.pipeline.reconstructor import Reconstructor
-from src.pipeline.features import FeatureDetector
-from src.pipeline.matching import FeatureMatcher
-from src.pipeline.pose import PoseEstimator
-from src.pipeline.triangulation import Triangulator
+from src.pipeline.feature_based.reconstructor import Reconstructor
+from src.pipeline.feature_based.features import FeatureDetector
+from src.pipeline.feature_based.matching import FeatureMatcher
+from src.pipeline.feature_based.pose import PoseEstimator
+from src.pipeline.feature_based.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 from src.io.point_cloud_writer import PointCloudWriter
-from src.pipeline.dense_reconstruction import DenseReconstructor
+from src.pipeline.feature_based.dense_reconstruction import DenseReconstructor
 from tests.modules_tests import prepare_test_pair, load_frames
 
-from src.config.camera import CAMERA_MATRIX
+from src.config.camera_palm_desert import CAMERA_MATRIX
 
 from src.config.paths import RECONSTRUCTION_OUTPUT
 

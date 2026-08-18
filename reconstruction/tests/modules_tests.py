@@ -2,17 +2,17 @@ import cv2
 import numpy as np
 
 from src.pipeline.camera import Camera
-from src.pipeline.features import FeatureDetector
-from src.pipeline.matching import FeatureMatcher
-from src.pipeline.pose import PoseEstimator
-from src.pipeline.triangulation import Triangulator
+from src.pipeline.feature_based.features import FeatureDetector
+from src.pipeline.feature_based.matching import FeatureMatcher
+from src.pipeline.feature_based.pose import PoseEstimator
+from src.pipeline.feature_based.triangulation import Triangulator
 from src.visualization.visualizer import Visualizer
 from src.optimization.bundle_adjustment import BundleAdjustment
 from src.optimization.ba_problem import BAProblem
 from src.core.point_cloud import PointCloud
 
 
-from src.config.camera import CAMERA_MATRIX
+from src.config.camera_palm_desert import CAMERA_MATRIX
 
 from src.config.paths import (
     DATASET_PATH,

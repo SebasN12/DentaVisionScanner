@@ -6,7 +6,7 @@ import numpy as np
 
 from src.core.match_result import MatchResult
 from src.core.point_cloud import PointCloud
-from src.pipeline.triangulation import Triangulator
+from src.pipeline.feature_based.triangulation import Triangulator
 
 
 class Reconstructor:

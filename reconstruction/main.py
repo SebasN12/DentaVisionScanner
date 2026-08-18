@@ -1,6 +1,7 @@
 import tests.modules_tests as module
 import tests.pair_tests as pair
 import tests.sfm_tests as sfm
+import tests.stereo_tests as stereo
 from src.visualization.visualizer import Visualizer
 from pathlib import Path
 from src.config.paths import OUTPUT_PATH
@@ -9,7 +10,10 @@ def main():
 
     # Change this depending on what you want to test
 
+
     # Pipeline A: pairwise reconstruction with OpenCV
+
+    # Feature based
 
     # module.test_load_single_frame()
 
@@ -25,13 +29,19 @@ def main():
 
     # module.test_triangulation()
 
-    pair.test_pairwise_reconstruction()
+    # pair.test_pairwise_reconstruction()
 
     # pair.test_pairwise_reconstruction_sequence()
 
     # module.test_pairwise_bundle_adjustment()
 
     # pair.test_dense_reconstruction()
+
+
+    # Stereo
+
+    stereo.test_stereo_sgbm()
+
 
 
     # Pipeline B: OpenMVG reconstruction
