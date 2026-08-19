@@ -40,7 +40,9 @@ def main():
 
     # Stereo
 
-    stereo.test_stereo_sgbm()
+    # stereo.test_stereo_sgbm()
+
+    stereo.test_depth_reconstruction()
 
 
 

@@ -8,7 +8,404 @@ import numpy as np
 from src.config.paths import DATASET_PATH
 from src.pipeline.camera import Camera
 from src.pipeline.stereo.matcher import StereoMatcher
+from src.pipeline.stereo.depth import DepthReconstructor
 
+
+def test_depth_reconstruction():
+    """
+    Tests depth reconstruction using the disparity produced
+    by StereoSGBM on the Middlebury Plastic stereo dataset.
+
+    The Middlebury 2006 dataset provides:
+
+    - focal length: 3740 pixels
+    - baseline: 160 mm
+
+    Therefore, the resulting depth is expressed in millimeters.
+    """
+
+    camera = Camera(DATASET_PATH)
+
+    frames = camera.load_frames()
+
+    if len(frames) < 4:
+        raise RuntimeError(
+            "The Middlebury Plastic dataset must contain "
+            "disp1.png, disp5.png, view1.png and view5.png."
+        )
+
+    left_frame = frames[2]
+    right_frame = frames[3]
+
+    print(f"Left image:  {left_frame.filename}")
+    print(f"Right image: {right_frame.filename}")
+
+    # ------------------------------------------------------------------
+    # Compute disparity.
+    # ------------------------------------------------------------------
+
+    matcher = StereoMatcher(
+        min_disparity=0,
+        num_disparities=128,
+        block_size=7,
+    )
+
+    disparity = matcher.compute(
+        left_frame.image,
+        right_frame.image,
+    )
+
+    valid_disparity = (
+        np.isfinite(disparity)
+        & (disparity > 0)
+    )
+
+    if not np.any(valid_disparity):
+        raise RuntimeError(
+            "StereoSGBM produced no valid disparity values."
+        )
+
+    # ------------------------------------------------------------------
+    # Compute depth.
+    # ------------------------------------------------------------------
+
+    depth_reconstructor = DepthReconstructor(
+        focal_length=3740.0,
+        baseline=160.0,
+    )
+
+    depth = depth_reconstructor.compute(
+        disparity
+    )
+
+    valid_depth = (
+        np.isfinite(depth)
+        & (depth > 0)
+    )
+
+    if not np.any(valid_depth):
+        raise RuntimeError(
+            "Depth reconstruction produced no valid "
+            "depth values."
+        )
+
+    # ------------------------------------------------------------------
+    # Print disparity statistics.
+    # ------------------------------------------------------------------
+
+    valid_disparities = disparity[valid_disparity]
+
+    print()
+    print("=" * 90)
+    print("STEREO DISPARITY")
+    print("=" * 90)
+
+    print(
+        f"  Shape:               "
+        f"{disparity.shape}"
+    )
+
+    print(
+        f"  Valid pixels:        "
+        f"{len(valid_disparities)}"
+    )
+
+    print(
+        f"  Minimum:             "
+        f"{valid_disparities.min():.2f} px"
+    )
+
+    print(
+        f"  Maximum:             "
+        f"{valid_disparities.max():.2f} px"
+    )
+
+    print(
+        f"  Mean:                "
+        f"{valid_disparities.mean():.2f} px"
+    )
+
+    print(
+        f"  Median:              "
+        f"{np.median(valid_disparities):.2f} px"
+    )
+
+    # ------------------------------------------------------------------
+    # Print depth statistics.
+    # ------------------------------------------------------------------
+
+    valid_depth_values = depth[valid_depth]
+
+    print()
+    print("=" * 90)
+    print("DEPTH")
+    print("=" * 90)
+
+    print(
+        f"  Shape:               "
+        f"{depth.shape}"
+    )
+
+    print(
+        f"  Valid pixels:        "
+        f"{len(valid_depth_values)}"
+    )
+
+    print(
+        f"  Minimum:             "
+        f"{valid_depth_values.min():.2f} mm"
+    )
+
+    print(
+        f"  Maximum:             "
+        f"{valid_depth_values.max():.2f} mm"
+    )
+
+    print(
+        f"  Mean:                "
+        f"{valid_depth_values.mean():.2f} mm"
+    )
+
+    print(
+        f"  Median:              "
+        f"{np.median(valid_depth_values):.2f} mm"
+    )
+
+    # ------------------------------------------------------------------
+    # Show representative depth values.
+    # ------------------------------------------------------------------
+
+    print()
+    print("=" * 90)
+    print("DISPARITY -> DEPTH")
+    print("=" * 90)
+
+    for disparity_value in (
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+    ):
+        depth_value = (
+            3740.0
+            * 160.0
+            / disparity_value
+        )
+
+        print(
+            f"  Disparity {disparity_value:5.1f} px"
+            f" -> "
+            f"Depth {depth_value:8.2f} mm"
+        )
+
+    # ------------------------------------------------------------------
+    # Visualize disparity and depth.
+    # ------------------------------------------------------------------
+
+    # --------------------------------------------------------------
+    # Disparity visualization.
+    # --------------------------------------------------------------
+
+    disparity_display = np.zeros_like(
+        disparity,
+        dtype=np.float32,
+    )
+
+    disparity_display[valid_disparity] = (
+        disparity[valid_disparity]
+    )
+
+    disparity_normalized = cv2.normalize(
+        disparity_display,
+        None,
+        0,
+        255,
+        cv2.NORM_MINMAX,
+    )
+
+    disparity_visualization = (
+        disparity_normalized.astype(np.uint8)
+    )
+
+    # --------------------------------------------------------------
+    # Depth visualization.
+    #
+    # Very small disparities produce extremely large depths.
+    # These values are valid mathematically, but make the
+    # visualization difficult to interpret.
+    #
+    # This threshold is ONLY for visualization.
+    # --------------------------------------------------------------
+
+    visualization_disparity_mask = (
+        valid_disparity
+        & (disparity >= 10.0)
+    )
+
+    visualization_depth = depth[
+        visualization_disparity_mask
+    ]
+
+    if len(visualization_depth) == 0:
+        raise RuntimeError(
+            "No valid depth values available for visualization."
+        )
+
+    depth_display = np.zeros_like(
+        depth,
+        dtype=np.float32,
+    )
+
+    depth_display[visualization_disparity_mask] = (
+        depth[visualization_disparity_mask]
+    )
+
+    depth_min = visualization_depth.min()
+    depth_max = visualization_depth.max()
+
+    depth_visualization = np.zeros_like(
+        depth,
+        dtype=np.uint8,
+    )
+
+    if depth_max > depth_min:
+
+        depth_visualization[
+            visualization_disparity_mask
+        ] = (
+            (
+                (
+                    depth[
+                        visualization_disparity_mask
+                    ]
+                    - depth_min
+                )
+                / (depth_max - depth_min)
+            )
+            * 255.0
+        ).astype(np.uint8)
+
+    # --------------------------------------------------------------
+    # Print visualization range.
+    # --------------------------------------------------------------
+
+    print()
+    print("=" * 90)
+    print("DEPTH VISUALIZATION")
+    print("=" * 90)
+
+    print(
+        f"  Minimum disparity:  "
+        f"{disparity[visualization_disparity_mask].min():.2f} px"
+    )
+
+    print(
+        f"  Maximum disparity:  "
+        f"{disparity[visualization_disparity_mask].max():.2f} px"
+    )
+
+    print(
+        f"  Minimum depth:      "
+        f"{depth_min:.2f} mm"
+    )
+
+    print(
+        f"  Maximum depth:      "
+        f"{depth_max:.2f} mm"
+    )
+
+    print(
+        f"  Valid pixels:       "
+        f"{len(visualization_depth)}"
+    )
+
+    # --------------------------------------------------------------
+    # Show visualizations.
+    # --------------------------------------------------------------
+
+    cv2.imshow(
+        "Disparity",
+        disparity_visualization,
+    )
+
+    cv2.imshow(
+        "Depth",
+        depth_visualization,
+    )
+
+    print()
+    print("Press any key to close the visualizations.")
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def test_stereo_sgbm():
+    """
+    Tests StereoSGBM on the Middlebury Plastic stereo dataset.
+
+    The dataset provides view1/view5 and the corresponding
+    ground-truth disparity map.
+    """
+
+    camera = Camera(DATASET_PATH)
+
+    frames = camera.load_frames()
+
+    if len(frames) < 4:
+        raise RuntimeError(
+            "The Middlebury Plastic dataset must contain "
+            "disp1.png, disp5.png, view1.png and view5.png."
+        )
+
+    left_frame = frames[2]
+    right_frame = frames[3]
+
+    print(f"Left image:  {left_frame.filename}")
+    print(f"Right image: {right_frame.filename}")
+
+    # ------------------------------------------------------------------
+    # Load ground truth.
+    # ------------------------------------------------------------------
+
+    disparity_path = DATASET_PATH / "disp1.png"
+
+    ground_truth_raw = cv2.imread(
+        str(disparity_path),
+        cv2.IMREAD_UNCHANGED,
+    )
+
+    if ground_truth_raw is None:
+        raise RuntimeError(
+            f"Unable to load ground-truth disparity: "
+            f"{disparity_path}"
+        )
+
+    # Middlebury third-size disparity maps use a scale factor of 3.
+    ground_truth = (
+        ground_truth_raw.astype(np.float32) / 3.0
+    )
+
+    valid_ground_truth = ground_truth_raw > 0
+
+    # ------------------------------------------------------------------
+    # Test different block sizes.
+    # ------------------------------------------------------------------
+
+    for block_size in (3, 5, 7):
+
+        _evaluate_stereo(
+            left_image=left_frame.image,
+            right_image=right_frame.image,
+            ground_truth=ground_truth,
+            valid_ground_truth=valid_ground_truth,
+            block_size=block_size,
+        )
+        
+
+# Helpers
 
 def _print_worst_regions(
     error_map: np.ndarray,
@@ -250,66 +647,3 @@ def _evaluate_stereo(
         error_map=error_map,
         valid_mask=valid_comparison,
     )
-
-
-def test_stereo_sgbm():
-    """
-    Tests StereoSGBM on the Middlebury Plastic stereo dataset.
-
-    The dataset provides view1/view5 and the corresponding
-    ground-truth disparity map.
-    """
-
-    camera = Camera(DATASET_PATH)
-
-    frames = camera.load_frames()
-
-    if len(frames) < 4:
-        raise RuntimeError(
-            "The Middlebury Plastic dataset must contain "
-            "disp1.png, disp5.png, view1.png and view5.png."
-        )
-
-    left_frame = frames[2]
-    right_frame = frames[3]
-
-    print(f"Left image:  {left_frame.filename}")
-    print(f"Right image: {right_frame.filename}")
-
-    # ------------------------------------------------------------------
-    # Load ground truth.
-    # ------------------------------------------------------------------
-
-    disparity_path = DATASET_PATH / "disp1.png"
-
-    ground_truth_raw = cv2.imread(
-        str(disparity_path),
-        cv2.IMREAD_UNCHANGED,
-    )
-
-    if ground_truth_raw is None:
-        raise RuntimeError(
-            f"Unable to load ground-truth disparity: "
-            f"{disparity_path}"
-        )
-
-    # Middlebury third-size disparity maps use a scale factor of 3.
-    ground_truth = (
-        ground_truth_raw.astype(np.float32) / 3.0
-    )
-
-    valid_ground_truth = ground_truth_raw > 0
-
-    # ------------------------------------------------------------------
-    # Test different block sizes.
-    # ------------------------------------------------------------------
-
-    for block_size in (3, 5, 7):
-
-        _evaluate_stereo(
-            left_image=left_frame.image,
-            right_image=right_frame.image,
-            ground_truth=ground_truth,
-            valid_ground_truth=valid_ground_truth,
-            block_size=block_size,
-        )
