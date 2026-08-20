@@ -48,3 +48,34 @@ DISTORTION_COEFFICIENTS = np.zeros(
     5,
     dtype=np.float64,
 )
+
+
+REPROJECTION_MATRIX = np.array(
+    [
+        [
+            1.0,
+            0.0,
+            0.0,
+            -PRINCIPAL_POINT[0],
+        ],
+        [
+            0.0,
+            1.0,
+            0.0,
+            -PRINCIPAL_POINT[1],
+        ],
+        [
+            0.0,
+            0.0,
+            0.0,
+            FOCAL_LENGTH,
+        ],
+        [
+            0.0,
+            0.0,
+            1.0 / BASELINE_MM,
+            0.0,
+        ],
+    ],
+    dtype=np.float64,
+)

@@ -42,7 +42,11 @@ def main():
 
     # stereo.test_stereo_sgbm()
 
-    stereo.test_depth_reconstruction()
+    # stereo.test_depth_reconstruction()
+
+    # stereo.test_stereo_validator()
+
+    stereo.test_stereo_reconstruction()
 
 
 

@@ -2,7 +2,7 @@
 
 This project contains two different 3D reconstruction pipelines:
 
-- Pipeline 1 (`src/`) – Custom pairwise pipeline implemented with OpenCV.
+- Pipeline 1 (`src/`) – Pairwise pipeline.
 * Pipeline 2 (`src_v2/`) – Reconstruction pipeline based on OpenMVG and OpenMVS, with OpenMVG handling the SfM stage and OpenMVS generating the final dense point cloud.
 
 ## Requirements
@@ -223,44 +223,55 @@ The internal structure of `src/` and `src_v2/` are currently documented below fo
 
 ```
 src/
-    │
+│
+├── __init__.py
+│
+├── config/
+│   ├── __init__.py
+│   ├── camera_middlebury.py
+│   ├── camera_palm_desert.py
+│   ├── paths.py
+│   └── settings.py
+│
+├── core/
+│   ├── __init__.py
+│   ├── frame.py
+│   ├── match_result.py
+│   ├── point_cloud.py
+│   └── triangulation_result.py
+│
+├── io/
+│   ├── __init__.py
+│   └── point_cloud_writer.py
+│
+├── optimization/
+│   ├── __init__.py
+│   ├── ba_problem.py
+│   └── bundle_adjustment.py
+│
+├── pipeline/
+│   ├── __init__.py
+│   ├── camera.py
+│   │
+│   ├── feature_based/
+│   │   ├── __init__.py
+│   │   ├── features.py
+│   │   ├── matching.py
+│   │   ├── pose.py
+│   │   ├── reconstructor.py
+│   │   ├── triangulation.py
+│   │   └── dense_reconstruction.py
+│   │
+│   └── stereo/
+│       ├── __init__.py
+│       ├── matcher.py
+│       ├── validator.py
+│       ├── depth.py
+│       └── stereo_reconstructor.py
+│
+└── visualization/
     ├── __init__.py
-    │
-    ├── config/
-    │   ├── __init__.py
-    │   ├── camera.py
-    │   ├── paths.py
-    │   └── settings.py
-    │
-    ├── core/
-    │   ├── __init__.py
-    │   ├── frame.py
-    │   ├── match_result.py
-    │   ├── point_cloud.py
-    │   └── triangulation_result.py
-    │
-    ├── io/
-    │   ├── __init__.py
-    │   └── point_cloud_writer.py
-    │
-    ├── optimization/
-    │   ├── __init__.py
-    │   ├── ba_problem.py
-    │   └── bundle_adjustment.py
-    │
-    ├── pipeline/
-    │   ├── __init__.py
-    │   ├── camera.py
-    │   ├── dense_reconstruction.py
-    │   ├── features.py
-    │   ├── matching.py
-    │   ├── pose.py
-    │   ├── reconstructor.py
-    │   └── triangulation.py
-    │
-    └── visualization/
-        ├── __init__.py
-        └── visualizer.py
+    └── visualizer.py
 ```
 ---
 
