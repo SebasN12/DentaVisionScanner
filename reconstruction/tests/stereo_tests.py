@@ -22,18 +22,7 @@ def test_stereo_sgbm():
     ground-truth disparity map.
     """
 
-    camera = Camera(DATASET_PATH)
-
-    frames = camera.load_frames()
-
-    if len(frames) < 4:
-        raise RuntimeError(
-            "The Middlebury Plastic dataset must contain "
-            "disp1.png, disp5.png, view1.png and view5.png."
-        )
-
-    left_frame = frames[2]
-    right_frame = frames[3]
+    left_frame, right_frame = _load_stereo_frames()
 
     print(f"Left image:  {left_frame.filename}")
     print(f"Right image: {right_frame.filename}")
@@ -76,44 +65,20 @@ def test_stereo_sgbm():
             block_size=block_size,
         )
 
-
 def test_stereo_validator():
     """
-    Tests StereoValidator using the disparity produced by
-    StereoSGBM on the Middlebury Plastic stereo dataset.
-
-    The test prints the number and percentage of valid and
-    invalid disparity pixels.
+    Tests StereoValidator using disparity produced by StereoSGBM.
     """
 
-    camera = Camera(DATASET_PATH)
-
-    frames = camera.load_frames()
-
-    left_frame = frames[2]
-    right_frame = frames[3]
+    left_frame, right_frame = _load_stereo_frames()
 
     print(f"Left image:  {left_frame.filename}")
     print(f"Right image: {right_frame.filename}")
 
-    # ------------------------------------------------------------------
-    # Compute raw disparity.
-    # ------------------------------------------------------------------
-
-    matcher = StereoMatcher(
-        min_disparity=0,
-        num_disparities=128,
-        block_size=7,
-    )
-
-    disparity = matcher.compute(
+    disparity = _compute_disparity(
         left_frame.image,
         right_frame.image,
     )
-
-    # ------------------------------------------------------------------
-    # Validate disparity.
-    # ------------------------------------------------------------------
 
     validator = StereoValidator()
 
@@ -121,74 +86,23 @@ def test_stereo_validator():
         disparity
     )
 
-    filtered_disparity = np.zeros_like(
-        disparity,
-        dtype=np.float32,
-    )
-
-    filtered_disparity[valid_mask] = (
-        disparity[valid_mask]
-    )
-
-    # ------------------------------------------------------------------
-    # Check that validation produced usable output.
-    # ------------------------------------------------------------------
-
-    if not np.any(valid_mask):
+    if valid_mask.shape != disparity.shape:
         raise RuntimeError(
-            "StereoValidator marked all disparity values as invalid."
+            "StereoValidator returned a mask with an invalid shape."
         )
 
-    # ------------------------------------------------------------------
-    # Compute statistics.
-    # ------------------------------------------------------------------
+    valid_pixels = np.count_nonzero(valid_mask)
+    invalid_pixels = disparity.size - valid_pixels
 
-    total_pixels = disparity.size
-
-    valid_pixels = np.count_nonzero(
-        valid_mask
-    )
-
-    invalid_pixels = (
-        total_pixels
-        - valid_pixels
-    )
-
-    valid_disparities = disparity[
-        valid_mask
-    ]
-
-    # ------------------------------------------------------------------
-    # Print validation results.
-    # ------------------------------------------------------------------
+    if valid_pixels == 0:
+        raise RuntimeError(
+            "StereoValidator found no valid disparity values."
+        )
 
     print()
     print("=" * 90)
     print("STEREO DISPARITY VALIDATION")
     print("=" * 90)
-
-    print()
-    print("Input disparity:")
-
-    print(
-        f"  Shape:               "
-        f"{disparity.shape}"
-    )
-
-    print(
-        f"  Total pixels:        "
-        f"{total_pixels}"
-    )
-
-    print(
-        f"  Finite pixels:       "
-        f"{np.count_nonzero(np.isfinite(disparity))}"
-    )
-
-    print(
-        f"  Positive pixels:     "
-        f"{np.count_nonzero(disparity > 0)}"
-    )
 
     print()
     print("Validation result:")
@@ -205,35 +119,12 @@ def test_stereo_validator():
 
     print(
         f"  Valid percentage:    "
-        f"{valid_pixels / total_pixels * 100:.2f}%"
+        f"{valid_pixels / disparity.size * 100:.2f}%"
     )
 
     print(
         f"  Removed percentage:  "
-        f"{invalid_pixels / total_pixels * 100:.2f}%"
-    )
-
-    print()
-    print("Validated disparity:")
-
-    print(
-        f"  Minimum:             "
-        f"{valid_disparities.min():.2f} px"
-    )
-
-    print(
-        f"  Maximum:             "
-        f"{valid_disparities.max():.2f} px"
-    )
-
-    print(
-        f"  Mean:                "
-        f"{valid_disparities.mean():.2f} px"
-    )
-
-    print(
-        f"  Median:              "
-        f"{np.median(valid_disparities):.2f} px"
+        f"{invalid_pixels / disparity.size * 100:.2f}%"
     )
 
 def test_depth_reconstruction():
@@ -250,40 +141,19 @@ def test_depth_reconstruction():
     Therefore, the resulting depth is expressed in millimeters.
     """
 
-    camera = Camera(DATASET_PATH)
-
-    frames = camera.load_frames()
-
-    if len(frames) < 4:
-        raise RuntimeError(
-            "The Middlebury Plastic dataset must contain "
-            "disp1.png, disp5.png, view1.png and view5.png."
-        )
-
-    left_frame = frames[2]
-    right_frame = frames[3]
+    left_frame, right_frame = _load_stereo_frames()
 
     print(f"Left image:  {left_frame.filename}")
     print(f"Right image: {right_frame.filename}")
 
     # ------------------------------------------------------------------
-    # Compute raw disparity.
+    # Compute and validate disparity.
     # ------------------------------------------------------------------
 
-    matcher = StereoMatcher(
-        min_disparity=0,
-        num_disparities=128,
-        block_size=7,
-    )
-
-    disparity = matcher.compute(
+    disparity = _compute_disparity(
         left_frame.image,
         right_frame.image,
     )
-
-    # ------------------------------------------------------------------
-    # Validate disparity.
-    # ------------------------------------------------------------------
 
     validator = StereoValidator()
 
@@ -299,19 +169,14 @@ def test_depth_reconstruction():
     # ------------------------------------------------------------------
     # Apply Middlebury disparity offset.
     #
-    # Middlebury disparity maps are cropped, so dmin must be
-    # added before converting disparity into 3D coordinates.
+    # The third-size Middlebury images are cropped.
+    # dmin must therefore be added before depth reconstruction.
     # ------------------------------------------------------------------
 
     dmin = 280.0
 
-    reconstruction_disparity = np.zeros_like(
-        disparity,
-        dtype=np.float32,
-    )
-
-    reconstruction_disparity[valid_disparity] = (
-        disparity[valid_disparity] + dmin
+    reconstruction_disparity = (
+        disparity + dmin
     )
 
     # ------------------------------------------------------------------
@@ -330,6 +195,7 @@ def test_depth_reconstruction():
     valid_depth = (
         np.isfinite(depth)
         & (depth > 0)
+        & valid_disparity
     )
 
     if not np.any(valid_depth):
@@ -342,7 +208,10 @@ def test_depth_reconstruction():
     # Print disparity statistics.
     # ------------------------------------------------------------------
 
-    valid_disparities = disparity[valid_disparity]
+    valid_disparities = disparity[
+        valid_disparity
+    ]
+
     valid_reconstruction_disparities = (
         reconstruction_disparity[valid_disparity]
     )
@@ -384,6 +253,7 @@ def test_depth_reconstruction():
 
     print()
     print("Middlebury reconstruction disparity:")
+
     print(
         f"  dmin:                "
         f"{dmin:.2f} px"
@@ -413,7 +283,9 @@ def test_depth_reconstruction():
     # Print depth statistics.
     # ------------------------------------------------------------------
 
-    valid_depth_values = depth[valid_depth]
+    valid_depth_values = depth[
+        valid_depth
+    ]
 
     print()
     print("=" * 90)
@@ -451,49 +323,8 @@ def test_depth_reconstruction():
     )
 
     # ------------------------------------------------------------------
-    # Show representative depth values.
+    # Visualize disparity.
     # ------------------------------------------------------------------
-
-    print()
-    print("=" * 90)
-    print("DISPARITY -> DEPTH")
-    print("=" * 90)
-
-    for disparity_value in (
-        10.0,
-        20.0,
-        30.0,
-        40.0,
-        50.0,
-        60.0,
-    ):
-        reconstruction_disparity_value = (
-            disparity_value + dmin
-        )
-
-        depth_value = (
-            3740.0
-            * 160.0
-            / reconstruction_disparity_value
-        )
-
-        print(
-            f"  StereoSGBM disparity "
-            f"{disparity_value:5.1f} px"
-            f" -> "
-            f"reconstruction disparity "
-            f"{reconstruction_disparity_value:6.1f} px"
-            f" -> "
-            f"Depth {depth_value:8.2f} mm"
-        )
-
-    # ------------------------------------------------------------------
-    # Visualize disparity and depth.
-    # ------------------------------------------------------------------
-
-    # --------------------------------------------------------------
-    # Disparity visualization.
-    # --------------------------------------------------------------
 
     disparity_display = np.zeros_like(
         disparity,
@@ -504,37 +335,24 @@ def test_depth_reconstruction():
         disparity[valid_disparity]
     )
 
-    disparity_normalized = cv2.normalize(
+    disparity_visualization = cv2.normalize(
         disparity_display,
         None,
         0,
         255,
         cv2.NORM_MINMAX,
-    )
-
-    disparity_visualization = (
-        disparity_normalized.astype(np.uint8)
-    )
+    ).astype(np.uint8)
 
     # ------------------------------------------------------------------
-    # Depth visualization.
-    #
-    # All validated disparities are used for visualization.
+    # Visualize depth.
     # ------------------------------------------------------------------
 
-    visualization_disparity_mask = valid_disparity
-
-    visualization_depth = depth[
-        visualization_disparity_mask
+    depth_values = depth[
+        valid_depth
     ]
 
-    if len(visualization_depth) == 0:
-        raise RuntimeError(
-            "No valid depth values available for visualization."
-        )
-
-    depth_min = visualization_depth.min()
-    depth_max = visualization_depth.max()
+    depth_min = depth_values.min()
+    depth_max = depth_values.max()
 
     depth_visualization = np.zeros_like(
         depth,
@@ -543,14 +361,10 @@ def test_depth_reconstruction():
 
     if depth_max > depth_min:
 
-        depth_visualization[
-            visualization_disparity_mask
-        ] = (
+        depth_visualization[valid_depth] = (
             (
                 (
-                    depth[
-                        visualization_disparity_mask
-                    ]
+                    depth[valid_depth]
                     - depth_min
                 )
                 / (depth_max - depth_min)
@@ -558,9 +372,9 @@ def test_depth_reconstruction():
             * 255.0
         ).astype(np.uint8)
 
-    # --------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Print visualization range.
-    # --------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     print()
     print("=" * 90)
@@ -569,32 +383,32 @@ def test_depth_reconstruction():
 
     print(
         f"  Minimum disparity:  "
-        f"{reconstruction_disparity[visualization_disparity_mask].min():.2f} px"
+        f"{reconstruction_disparity[valid_disparity].min():.2f} px"
     )
 
     print(
         f"  Maximum disparity:  "
-        f"{reconstruction_disparity[visualization_disparity_mask].max():.2f} px"
+        f"{reconstruction_disparity[valid_disparity].max():.2f} px"
     )
 
     print(
-        f"  Minimum depth:      "
+        f"  Minimum depth:       "
         f"{depth_min:.2f} mm"
     )
 
     print(
-        f"  Maximum depth:      "
+        f"  Maximum depth:       "
         f"{depth_max:.2f} mm"
     )
 
     print(
-        f"  Valid pixels:       "
-        f"{len(visualization_depth)}"
+        f"  Valid pixels:        "
+        f"{len(depth_values)}"
     )
 
-    # --------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Show visualizations.
-    # --------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     cv2.imshow(
         "Disparity",
@@ -626,18 +440,7 @@ def test_stereo_reconstruction():
             -> point cloud visualization
     """
 
-    camera = Camera(DATASET_PATH)
-
-    frames = camera.load_frames()
-
-    if len(frames) < 4:
-        raise RuntimeError(
-            "The Middlebury Plastic dataset must contain "
-            "disp1.png, disp5.png, view1.png and view5.png."
-        )
-
-    left_frame = frames[2]
-    right_frame = frames[3]
+    left_frame, right_frame = _load_stereo_frames()
 
     print(f"Left image:  {left_frame.filename}")
     print(f"Right image: {right_frame.filename}")
@@ -646,13 +449,7 @@ def test_stereo_reconstruction():
     # Compute disparity.
     # ------------------------------------------------------------------
 
-    matcher = StereoMatcher(
-        min_disparity=0,
-        num_disparities=128,
-        block_size=7,
-    )
-
-    disparity = matcher.compute(
+    disparity = _compute_disparity(
         left_frame.image,
         right_frame.image,
     )
@@ -745,102 +542,42 @@ def test_stereo_reconstruction():
 
 # Helpers
 
-def _print_worst_regions(
-    error_map: np.ndarray,
-    valid_mask: np.ndarray,
-    rows: int = 10,
-    cols: int = 12,
-    max_regions: int = 10,
-):
+def _compute_disparity(
+    left_image: np.ndarray,
+    right_image: np.ndarray,
+    block_size: int = 7,
+) -> np.ndarray:
     """
-    Prints the regions with the highest percentage of pixels
-    having an absolute disparity error above 5 pixels.
+    Computes stereo disparity using StereoSGBM.
     """
 
-    height, width = error_map.shape
-
-    row_edges = np.linspace(
-        0,
-        height,
-        rows + 1,
-        dtype=int,
+    matcher = StereoMatcher(
+        min_disparity=0,
+        num_disparities=128,
+        block_size=block_size,
     )
 
-    col_edges = np.linspace(
-        0,
-        width,
-        cols + 1,
-        dtype=int,
+    return matcher.compute(
+        left_image,
+        right_image,
     )
 
-    regions = []
+def _load_stereo_frames():
+    """
+    Loads the left and right frames from the Middlebury dataset.
+    """
 
-    for row in range(rows):
-        for col in range(cols):
+    camera = Camera(DATASET_PATH)
 
-            y0 = row_edges[row]
-            y1 = row_edges[row + 1]
+    frames = camera.load_frames()
 
-            x0 = col_edges[col]
-            x1 = col_edges[col + 1]
-
-            region_error = error_map[y0:y1, x0:x1]
-            region_valid = valid_mask[y0:y1, x0:x1]
-
-            valid_errors = region_error[region_valid]
-
-            if len(valid_errors) == 0:
-                continue
-
-            regions.append(
-                {
-                    "row": row,
-                    "col": col,
-                    "x0": x0,
-                    "x1": x1,
-                    "y0": y0,
-                    "y1": y1,
-                    "valid": len(valid_errors),
-                    "bad_percentage": (
-                        np.mean(valid_errors > 5.0) * 100.0
-                    ),
-                    "mae": np.mean(valid_errors),
-                    "median": np.median(valid_errors),
-                }
-            )
-
-    regions.sort(
-        key=lambda region: region["bad_percentage"],
-        reverse=True,
-    )
-
-    print()
-    print("=" * 90)
-    print("WORST ERROR REGIONS")
-    print("=" * 90)
-
-    print()
-    print(
-        "Rank | Region | Coordinates | "
-        "Bad >5px | MAE | Median | Valid"
-    )
-
-    print("-" * 90)
-
-    for rank, region in enumerate(
-        regions[:max_regions],
-        start=1,
-    ):
-        print(
-            f"{rank:4d} | "
-            f"R{region['row']} C{region['col']} | "
-            f"x={region['x0']}:{region['x1']}, "
-            f"y={region['y0']}:{region['y1']} | "
-            f"{region['bad_percentage']:7.2f}% | "
-            f"{region['mae']:5.2f} | "
-            f"{region['median']:6.2f} | "
-            f"{region['valid']}"
+    if len(frames) < 4:
+        raise RuntimeError(
+            "The Middlebury Plastic dataset must contain "
+            "disp1.png, disp5.png, view1.png and view5.png."
         )
+
+    return frames[2], frames[3]
 
 
 def _evaluate_stereo(
@@ -855,15 +592,10 @@ def _evaluate_stereo(
     against the Middlebury ground truth.
     """
 
-    matcher = StereoMatcher(
-        min_disparity=0,
-        num_disparities=128,
-        block_size=block_size,
-    )
-
-    disparity = matcher.compute(
+    disparity = _compute_disparity(
         left_image,
         right_image,
+        block_size=block_size,
     )
 
     valid_disparity = disparity > 0
@@ -979,9 +711,4 @@ def _evaluate_stereo(
     print(
         f"  Absolute error > 5 px:    "
         f"{np.mean(absolute_error > 5.0) * 100:.2f}%"
-    )
-
-    _print_worst_regions(
-        error_map=error_map,
-        valid_mask=valid_comparison,
     )
