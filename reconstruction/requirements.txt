@@ -4,4 +4,16 @@ open3d
 matplotlib
 scipy
 tqdm
-dotenv
+python-dotenv
+
+# For OpenStereo
+easydict
+tensorboard
+six
+PyYAML
+scikit-image
+thop
+timm==0.4.12
+h5py
+einops
+trimesh
