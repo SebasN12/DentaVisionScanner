@@ -24,9 +24,10 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# Virtual environments
+# Environments
 .venv/
 venv/
+.open_venv/
 env/
 .env
 
@@ -41,9 +42,6 @@ reconstruction/output/
 # Raw captures from the scanner
 reconstruction/data/images/
 !reconstruction/data/images/.gitkeep
-
-# test datasets
-reconstruction/data/test_dataset/middlebury/*
 
 # Calibration files
 reconstruction/data/calibration/

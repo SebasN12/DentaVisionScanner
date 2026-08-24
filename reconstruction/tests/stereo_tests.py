@@ -5,10 +5,21 @@ Tests for stereo reconstruction.
 import cv2
 import numpy as np
 
-from src.config.paths import DATASET_PATH
-from src.config.camera_middlebury import REPROJECTION_MATRIX
+from src.config.paths import (
+    DATASET_PATH,
+    OPENSTEREO_PATH,
+    IGEV_CHECKPOINT,
+)
+
+from src.config.camera_middlebury import (
+    BASELINE_MM,
+    FOCAL_LENGTH,
+    REPROJECTION_MATRIX,
+)
+
 from src.pipeline.camera import Camera
-from src.pipeline.stereo.matcher import StereoMatcher
+from src.pipeline.stereo.sgbm_matcher import StereoMatcher
+from src.pipeline.stereo.igev_matcher import IGEVMatcher
 from src.pipeline.stereo.depth import DepthReconstructor
 from src.pipeline.stereo.validator import StereoValidator
 from src.pipeline.stereo.stereo_reconstructor import StereoReconstructor
@@ -540,6 +551,271 @@ def test_stereo_reconstruction():
         point_cloud
     )
 
+def test_igev_disparity():
+    """
+    Tests IGEV disparity on the Middlebury Plastic
+    stereo dataset against the ground-truth disparity.
+    """
+
+    left_frame, right_frame = _load_stereo_frames()
+
+    print(f"Left image:  {left_frame.filename}")
+    print(f"Right image: {right_frame.filename}")
+
+    # ------------------------------------------------------------------
+    # Load ground truth.
+    # ------------------------------------------------------------------
+
+    disparity_path = DATASET_PATH / "disp1.png"
+
+    ground_truth_raw = cv2.imread(
+        str(disparity_path),
+        cv2.IMREAD_UNCHANGED,
+    )
+
+    if ground_truth_raw is None:
+        raise RuntimeError(
+            f"Unable to load ground-truth disparity: "
+            f"{disparity_path}"
+        )
+
+    # Middlebury third-size disparity maps use a scale factor of 3.
+    ground_truth = (
+        ground_truth_raw.astype(np.float32) / 3.0
+    )
+
+    valid_ground_truth = ground_truth_raw > 0
+
+    # ------------------------------------------------------------------
+    # Compute IGEV disparity.
+    # ------------------------------------------------------------------
+
+    matcher = IGEVMatcher(
+        config_path=OPENSTEREO_PATH
+        / "cfgs"
+        / "igev"
+        / "igev_sceneflow_amp.yaml",
+        checkpoint_path=OPENSTEREO_PATH
+        / "pretrained_models"
+        / "igev"
+        / "sceneflow.pth",
+    )
+
+    disparity = matcher.compute(
+        left_frame.image,
+        right_frame.image,
+    )
+
+    # ------------------------------------------------------------------
+    # Evaluate.
+    # ------------------------------------------------------------------
+
+    _evaluate_igev(
+        disparity=disparity,
+        ground_truth=ground_truth,
+        valid_ground_truth=valid_ground_truth,
+    )
+
+def test_igev_reconstruction():
+    """
+    Tests dense stereo reconstruction using IGEV through OpenStereo.
+
+    The pipeline consists of:
+
+        IGEV
+            -> disparity
+            -> disparity validation
+            -> depth reconstruction
+            -> 3D reconstruction
+            -> point cloud visualization
+    """
+
+    left_frame, right_frame = _load_stereo_frames()
+
+    print(f"Left image:  {left_frame.filename}")
+    print(f"Right image: {right_frame.filename}")
+
+    # ------------------------------------------------------------------
+    # Compute disparity.
+    # ------------------------------------------------------------------
+
+    matcher = IGEVMatcher(
+        config_path=OPENSTEREO_PATH
+        / "cfgs"
+        / "igev"
+        / "igev_sceneflow_amp.yaml",
+        checkpoint_path=IGEV_CHECKPOINT,
+    )
+
+    disparity = matcher.compute(
+        left_frame.image,
+        right_frame.image,
+    )
+
+    print()
+    print("=" * 90)
+    print("IGEV DISPARITY")
+    print("=" * 90)
+
+    print(
+        f"  Shape:   {disparity.shape}"
+    )
+
+    print(
+        f"  Min:     {disparity.min():.4f} px"
+    )
+
+    print(
+        f"  Max:     {disparity.max():.4f} px"
+    )
+
+    print(
+        f"  Mean:    {disparity.mean():.4f} px"
+    )
+
+    print(
+        f"  Median:  {np.median(disparity):.4f} px"
+    )
+
+    # ------------------------------------------------------------------
+    # Validate disparity.
+    # ------------------------------------------------------------------
+
+    validator = StereoValidator()
+
+    valid_mask = validator.compute_valid_mask(
+        disparity
+    )
+
+    valid_pixels = np.count_nonzero(
+        valid_mask
+    )
+
+    total_pixels = valid_mask.size
+
+    print()
+    print("=" * 90)
+    print("DISPARITY VALIDATION")
+    print("=" * 90)
+
+    print(
+        f"  Valid pixels:     {valid_pixels}"
+    )
+
+    print(
+        f"  Invalid pixels:   "
+        f"{total_pixels - valid_pixels}"
+    )
+
+    print(
+        f"  Valid percentage: "
+        f"{valid_pixels / total_pixels * 100:.2f}%"
+    )
+
+    # ------------------------------------------------------------------
+    # Reconstruct depth.
+    #
+    # Middlebury Plastic ThirdSize:
+    #
+    # Focal length = 3740 / 3 px
+    # Baseline     = 160 mm
+    # ------------------------------------------------------------------
+
+    depth_reconstructor = DepthReconstructor(
+        focal_length=FOCAL_LENGTH,
+        baseline=BASELINE_MM,
+    )
+
+    depth = depth_reconstructor.compute(
+        disparity
+    )
+
+    valid_depth = depth[valid_mask]
+
+    print()
+    print("=" * 90)
+    print("DEPTH RECONSTRUCTION")
+    print("=" * 90)
+
+    print(
+        f"  Shape:   {depth.shape}"
+    )
+
+    print(
+        f"  Min:     {valid_depth.min():.2f} mm"
+    )
+
+    print(
+        f"  Max:     {valid_depth.max():.2f} mm"
+    )
+
+    print(
+        f"  Mean:    {valid_depth.mean():.2f} mm"
+    )
+
+    print(
+        f"  Median:  {np.median(valid_depth):.2f} mm"
+    )
+
+    print("  Unit:    mm")
+
+    # ------------------------------------------------------------------
+    # Reconstruct point cloud.
+    # ------------------------------------------------------------------
+
+    reconstructor = StereoReconstructor(
+        reprojection_matrix=REPROJECTION_MATRIX,
+    )
+
+    point_cloud = reconstructor.reconstruct(
+        disparity=disparity,
+        image=left_frame.image,
+        valid_mask=valid_mask,
+    )
+
+    # ------------------------------------------------------------------
+    # Print reconstruction statistics.
+    # ------------------------------------------------------------------
+
+    print()
+    print("=" * 90)
+    print("IGEV STEREO RECONSTRUCTION")
+    print("=" * 90)
+
+    print(
+        f"  Input disparity shape: "
+        f"{disparity.shape}"
+    )
+
+    print(
+        f"  Valid disparity pixels: "
+        f"{valid_pixels}"
+    )
+
+    print(
+        f"  Reconstructed points:   "
+        f"{len(point_cloud.points)}"
+    )
+
+    print(
+        f"  Point dimensions:       "
+        f"{point_cloud.points.shape}"
+    )
+
+    if point_cloud.colors is not None:
+        print(
+            f"  Point colors:           "
+            f"{point_cloud.colors.shape}"
+        )
+
+    # ------------------------------------------------------------------
+    # Show point cloud.
+    # ------------------------------------------------------------------
+
+    Visualizer.show_point_cloud(
+        point_cloud
+    )
+
 # Helpers
 
 def _compute_disparity(
@@ -636,6 +912,127 @@ def _evaluate_stereo(
 
     print()
     print("StereoSGBM:")
+    print(f"  Disparity shape:    {disparity.shape}")
+    print(
+        f"  Minimum disparity:  "
+        f"{predicted.min():.2f}"
+    )
+    print(
+        f"  Maximum disparity:  "
+        f"{predicted.max():.2f}"
+    )
+    print(
+        f"  Mean disparity:     "
+        f"{predicted.mean():.2f}"
+    )
+    print(
+        f"  Median disparity:   "
+        f"{np.median(predicted):.2f}"
+    )
+
+    print()
+    print("Ground truth:")
+    print(
+        f"  Minimum disparity:  "
+        f"{expected.min():.2f}"
+    )
+    print(
+        f"  Maximum disparity:  "
+        f"{expected.max():.2f}"
+    )
+    print(
+        f"  Mean disparity:     "
+        f"{expected.mean():.2f}"
+    )
+    print(
+        f"  Median disparity:   "
+        f"{np.median(expected):.2f}"
+    )
+
+    print()
+    print("Pixel-wise comparison:")
+    print(
+        f"  Valid comparison pixels: "
+        f"{len(predicted)}"
+    )
+    print(
+        f"  Mean absolute error:      "
+        f"{absolute_error.mean():.2f} px"
+    )
+    print(
+        f"  Median absolute error:    "
+        f"{np.median(absolute_error):.2f} px"
+    )
+    print(
+        f"  Maximum absolute error:   "
+        f"{absolute_error.max():.2f} px"
+    )
+    print(
+        f"  Mean signed error:        "
+        f"{signed_error.mean():.2f} px"
+    )
+    print(
+        f"  Median signed error:      "
+        f"{np.median(signed_error):.2f} px"
+    )
+
+    print(
+        f"  Absolute error > 1 px:    "
+        f"{np.mean(absolute_error > 1.0) * 100:.2f}%"
+    )
+    print(
+        f"  Absolute error > 2 px:    "
+        f"{np.mean(absolute_error > 2.0) * 100:.2f}%"
+    )
+    print(
+        f"  Absolute error > 5 px:    "
+        f"{np.mean(absolute_error > 5.0) * 100:.2f}%"
+    )
+
+def _evaluate_igev(
+    disparity: np.ndarray,
+    ground_truth: np.ndarray,
+    valid_ground_truth: np.ndarray,
+):
+    """
+    Evaluates IGEV disparity against the Middlebury
+    ground-truth disparity.
+    """
+
+    valid_disparity = (
+        np.isfinite(disparity)
+        & (disparity > 0)
+    )
+
+    valid_comparison = (
+        valid_ground_truth
+        & valid_disparity
+    )
+
+    predicted = disparity[valid_comparison]
+    expected = ground_truth[valid_comparison]
+
+    if len(predicted) == 0:
+        raise RuntimeError(
+            "There are no pixels where both IGEV "
+            "and the ground truth provide valid disparities."
+        )
+
+    absolute_error = np.abs(
+        predicted - expected
+    )
+
+    signed_error = (
+        predicted - expected
+    )
+
+    print()
+    print("=" * 90)
+    print("IGEV DISPARITY EVALUATION")
+    print("=" * 90)
+
+    print()
+    print("IGEV:")
     print(f"  Disparity shape:    {disparity.shape}")
     print(
         f"  Minimum disparity:  "

@@ -27,6 +27,8 @@ def test_load_single_frame():
 
     camera = Camera(DATASET_PATH)
 
+    # change to valid name in dataset
+    
     frame_name = "DJI_0042.JPG"
 
     frame = camera.load_frame(frame_name)

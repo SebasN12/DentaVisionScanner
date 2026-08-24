@@ -1,6 +1,9 @@
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
 
 # desert dataset
 # DATASET_PATH = PROJECT_ROOT / "data" / "test_dataset"
@@ -25,3 +28,13 @@ MATCHES_OUTPUT = OUTPUT_PATH / "matches"
 INLIERS_OUTPUT = OUTPUT_PATH / "inliers"
 
 RECONSTRUCTION_OUTPUT = OUTPUT_PATH / "reconstruction"
+
+# OpenStereo
+
+OPENSTEREO_PATH = Path(
+    os.getenv("OPENSTEREO_PATH")
+)
+
+IGEV_CHECKPOINT = Path(
+    os.getenv("IGEV_CHECKPOINT")
+)

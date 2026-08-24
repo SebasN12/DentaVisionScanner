@@ -15,6 +15,10 @@ The current Pipeline 2 configuration is designed around the directory structures
 
 OpenMVS is used for optional dense reconstruction. The sparse reconstruction stage can be run independently using OpenMVG.
 
+IGEV through OpenStereo requires a CUDA-capable NVIDIA GPU and the dependencies required by OpenStereo.
+
+OpenStereo itself does not need to be modified except for disabling, by comenting it, the optional FoundationStereo import when FoundationStereo is not being used. This is required because the original import requires additional dependencies that are not needed by the IGEV pipeline.
+
 ## Install dependencies
 
 ```bash
@@ -31,6 +35,8 @@ The following paths are required:
 INPUT_IMAGES_DIRECTORY=C:\path\to\your\images
 OPENMVG_ROOT=C:\path\to\your\openMVG
 OPENMVS_ROOT=C:\path\to\your\openMVS
+OPENSTEREO_PATH=C:\path\to\OpenStereo
+IGEV_CHECKPOINT=C:\path\to\igev\sceneflow.pth
 ```
 
 `INPUT_IMAGES_DIRECTORY`
@@ -127,9 +133,42 @@ OPENMVS_ROOT=C:\dev\openMVS
 ```
 Only the executables required by the current pipeline need to be present. In particular, the pipeline currently uses `DensifyPointCloud.exe` and the OpenMVG-to-OpenMVS conversion executable.
 
+---
+
+`OPENSTEREO_PATH`
+
+Path to the OpenStereo root directory.
+
+Example:
+
+```
+OPENSTEREO_PATH=C:\dev\OpenStereo
+```
+The OpenStereo directory must contain the `stereo/` package and the IGEV configuration files.
+
+The project currently uses the IGEV SceneFlow configuration:
+
+```
+OPENSTEREO_PATH/cfgs/igev/igev_sceneflow_amp.yaml
+```
+
+---
+
+`IGEV_CHECKPOINT`
+
+Path to the pretrained IGEV SceneFlow checkpoint.
+
+Example:
+
+```
+IGEV_CHECKPOINT=C:\dev\pretrained_models\igev\sceneflow.pth
+```
+
+The checkpoint does not need to be located inside the OpenStereo directory.
+
 ## Running the reconstruction
 
-### Pipeline 1 – Custom OpenCV pipeline
+### Pipeline 1 – Pairwise pipeline (SIFT and SGBM with OpenCV)
 Once the Python dependencies are installed, the pipeline can be run directly:
 ```
 python main.py
@@ -168,6 +207,38 @@ The current configuration uses:
 CAMERA_MODEL = 3
 ```
 which corresponds to OpenMVG's Pinhole radial 3 camera model.
+
+### Pipeline 3 – IGEV stereo reconstruction
+
+This pipeline uses the IGEV stereo matching model provided by OpenStereo to generate a dense disparity map from a rectified stereo pair.
+
+The pipeline performs:
+
+- Stereo disparity estimation with IGEV.
+- Disparity validation.
+- Depth reconstruction.
+- 3D point cloud reconstruction.
+- Point cloud visualization.
+
+Before running the pipeline, make sure that:
+
+1. OpenStereo is available at the path configured by `OPENSTEREO_PATH`.
+2. The IGEV pretrained checkpoint is available at the path configured by `IGEV_CHECKPOINT`.
+3. The required Python dependencies are installed.
+4. CUDA is available.
+
+## OpenStereo
+The project uses OpenStereo as an external dependency for IGEV stereo matching.
+
+The OpenStereo source code is kept separately from the DentaVisionScanner repository and its location is configured through `OPENSTEREO_PATH`.
+
+Only the following modifications to the original OpenStereo code are required by the current project:
+
+- The optional FoundationStereo import in stereo/modeling/__init__.py is commented out because FoundationStereo is not used by the project and requires additional dependencies.
+- The IGEV inference output is cropped in the DentaVisionScanner integration to restore the original input image dimensions after OpenStereo preprocessing padding.
+
+The pretrained IGEV checkpoint is stored separately and its path is configured through `IGEV_CHECKPOINT`.
+
 
 ## Output
 
@@ -218,79 +289,4 @@ reconstruction/
 │
 └── src_v2/
     └── ...
-```
-The internal structure of `src/` and `src_v2/` are currently documented below for reference:
-
-```
-src/
-│
-├── __init__.py
-│
-├── config/
-│   ├── __init__.py
-│   ├── camera_middlebury.py
-│   ├── camera_palm_desert.py
-│   ├── paths.py
-│   └── settings.py
-│
-├── core/
-│   ├── __init__.py
-│   ├── frame.py
-│   ├── match_result.py
-│   ├── point_cloud.py
-│   └── triangulation_result.py
-│
-├── io/
-│   ├── __init__.py
-│   └── point_cloud_writer.py
-│
-├── optimization/
-│   ├── __init__.py
-│   ├── ba_problem.py
-│   └── bundle_adjustment.py
-│
-├── pipeline/
-│   ├── __init__.py
-│   ├── camera.py
-│   │
-│   ├── feature_based/
-│   │   ├── __init__.py
-│   │   ├── features.py
-│   │   ├── matching.py
-│   │   ├── pose.py
-│   │   ├── reconstructor.py
-│   │   ├── triangulation.py
-│   │   └── dense_reconstruction.py
-│   │
-│   └── stereo/
-│       ├── __init__.py
-│       ├── matcher.py
-│       ├── validator.py
-│       ├── depth.py
-│       └── stereo_reconstructor.py
-│
-└── visualization/
-    ├── __init__.py
-    └── visualizer.py
-```
----
-
-```
-src_v2/
-│
-├── __init__.py
-│
-├── config/
-│   ├── __init__.py
-│   └── settings.py
-│
-├── reconstruction/
-│   ├── __init__.py
-│   ├── openmvg.py
-│   ├── openmvs.py
-│   └── pipeline.py
-│
-└── utils/
-    ├── __init__.py
-    └── process.py
 ```
