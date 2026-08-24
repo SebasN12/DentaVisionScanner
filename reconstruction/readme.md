@@ -166,6 +166,14 @@ The project currently uses the IGEV SceneFlow configuration:
 OPENSTEREO_PATH/cfgs/igev/igev_sceneflow_amp.yaml
 ```
 
+Clone OpenStereo from the official repository:
+
+OpenStereo – [GitHub repository](https://github.com/XiandaGuo/OpenStereo)
+
+The version currently used by the project can be cloned with:
+```
+git clone --branch v2 https://github.com/XiandaGuo/OpenStereo.git
+```
 ---
 
 `IGEV_CHECKPOINT`
@@ -179,6 +187,12 @@ IGEV_CHECKPOINT=C:\dev\pretrained_models\igev\sceneflow.pth
 ```
 
 The checkpoint does not need to be located inside the OpenStereo directory.
+
+Download the pretrained IGEV SceneFlow checkpoint. You can follow the instructions from IGEV repository:
+
+IGEV repository – [Pretrained models](https://github.com/gangweiX/IGEV)
+
+The project currently uses the `sceneflow.pth` checkpoint for IGEV.
 
 ## Running the reconstruction
 
