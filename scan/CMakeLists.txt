@@ -11,16 +11,17 @@ add_executable(
 
     src/main.cpp
 
-    # Hardware
-    src/hardware/mock/MockScannerHardware.cpp
-    src/hardware/GvcpClient.cpp
-    src/hardware/GvcpSequence.cpp
+    # Packet capture and analysis
     src/capture/GvspReceiver.cpp
     src/capture/GvspAnalyzer.cpp
 
-    # Network capture / UDP
+    # Mock hardware
+    src/hardware/mock/MockScannerHardware.cpp
+
+    # Hardware / network communication
     src/hardware/UDPClient.cpp
-    src/capture/CaptureSession.cpp
+    src/hardware/GvcpClient.cpp
+    src/hardware/GvcpSequence.cpp
 
     # Scanner
     src/scanner/Scanner.cpp
