@@ -53,9 +53,9 @@ def main():
 
     # stereo.test_stereo_reconstruction()
 
-    # stereo.test_igev_disparity()
+    stereo.test_igev_disparity()
 
-    stereo.test_igev_reconstruction()
+    # stereo.test_igev_reconstruction()
 
 
 

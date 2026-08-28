@@ -595,10 +595,7 @@ def test_igev_disparity():
         / "cfgs"
         / "igev"
         / "igev_sceneflow_amp.yaml",
-        checkpoint_path=OPENSTEREO_PATH
-        / "pretrained_models"
-        / "igev"
-        / "sceneflow.pth",
+        checkpoint_path=IGEV_CHECKPOINT,
     )
 
     disparity = matcher.compute(
@@ -615,6 +612,23 @@ def test_igev_disparity():
         ground_truth=ground_truth,
         valid_ground_truth=valid_ground_truth,
     )
+
+    # ------------------------------------------------------------------
+    # Visualize disparity.
+    # ------------------------------------------------------------------
+
+    disparity_vis = cv2.normalize(
+        disparity,
+        None,
+        0,
+        255,
+        cv2.NORM_MINMAX,
+        dtype=cv2.CV_8U,
+    )
+
+    cv2.imshow("IGEV Disparity", disparity_vis)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def test_igev_reconstruction():
     """
