@@ -65,13 +65,12 @@ class IGEVMatcher:
                 f"IGEV checkpoint not found: {self.checkpoint_path}"
             )
 
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA is not available. IGEV requires a CUDA-capable GPU "
-                "for this inference pipeline."
-            )
-
-        self.device = torch.device("cuda:0")
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda:0")
+            print("Device: GPU")
+        else:
+            self.device = torch.device("cpu")
+            print("Device: CPU")
 
         # --------------------------------------------------------------
         # Load OpenStereo configuration.
@@ -111,6 +110,7 @@ class IGEVMatcher:
         )
 
         self.model = self.trainer.model
+        self.model.to(self.device)
         self.model.eval()
 
         # --------------------------------------------------------------
@@ -216,8 +216,11 @@ class IGEVMatcher:
         # --------------------------------------------------------------
 
         with torch.amp.autocast(
-            device_type="cuda",
-            enabled=self.cfgs.OPTIMIZATION.AMP,
+            device_type=self.device.type,
+            enabled=(
+                self.device.type == "cuda"
+                and self.cfgs.OPTIMIZATION.AMP
+            ),
         ):
             model_pred = self.model(sample)
 
