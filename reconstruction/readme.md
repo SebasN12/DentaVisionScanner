@@ -15,7 +15,7 @@ The current Pipeline 2 configuration is designed around the directory structures
 
 OpenMVS is used for optional dense reconstruction. The sparse reconstruction stage can be run independently using OpenMVG.
 
-The IGEV stereo pipeline requires a CUDA-capable NVIDIA GPU. The current implementation uses PyTorch with CUDA and does not support CPU inference.
+The IGEV stereo pipeline uses PyTorch and supports both CUDA-enabled NVIDIA GPUs and CPU inference. CUDA is used automatically when available, while CPU inference is used as a fallback when CUDA is unavailable.
 
 OpenStereo itself does not need to be modified except for disabling, by commenting it out, the optional FoundationStereo import when FoundationStereo is not being used. This is required because the original import introduces additional dependencies that are not required by the IGEV pipeline.
 
