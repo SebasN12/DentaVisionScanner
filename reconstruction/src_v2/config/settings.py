@@ -85,9 +85,26 @@ MATCH_RATIO = 0.8
 
 SFM_ENGINE = "INCREMENTAL"
 
+# For palm desert
+
 CAMERA_MODEL = 3
 
-REFINE_INTRINSICS = "ADJUST_ALL"
+CAMERA_FOCAL_LENGTH = None
+
+CAMERA_PRINCIPAL_POINT = None
+
+GEOMETRIC_MODEL = "e"
+
+
+# For middlebury 2006
+
+# CAMERA_MODEL = 1
+
+# CAMERA_FOCAL_LENGTH = 3740.0 / 3.0
+
+# CAMERA_PRINCIPAL_POINT = (423.0 / 2.0, 370.0 / 2.0)
+
+# GEOMETRIC_MODEL = "f"
 
 # ---------------------------------------------------------------------------
 # OpenMVS

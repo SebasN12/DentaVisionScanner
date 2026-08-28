@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from src_v2.config.settings import OPENMVG_BIN_DIRECTORY
+from src_v2.config.settings import (
+    CAMERA_FOCAL_LENGTH,
+    CAMERA_PRINCIPAL_POINT,
+    OPENMVG_BIN_DIRECTORY,
+    GEOMETRIC_MODEL,
+)
+
 from src_v2.utils.process import run_command
 
 
@@ -44,18 +50,40 @@ class OpenMVG:
             "openMVG_main_SfMInit_ImageListing"
         )
 
+        args = [
+            "-i",
+            str(image_directory),
+            "-d",
+            str(sensor_width_database),
+            "-o",
+            str(output_directory),
+            "-c",
+            str(camera_model),
+        ]
+
+        if CAMERA_FOCAL_LENGTH is not None:
+            if CAMERA_PRINCIPAL_POINT is not None:
+                cx, cy = CAMERA_PRINCIPAL_POINT
+
+                intrinsic_matrix = (
+                    f"{CAMERA_FOCAL_LENGTH};0;{cx};"
+                    f"0;{CAMERA_FOCAL_LENGTH};{cy};"
+                    "0;0;1"
+                )
+
+                args.extend([
+                    "-k",
+                    intrinsic_matrix,
+                ])
+            else:
+                args.extend([
+                    "-f",
+                    str(CAMERA_FOCAL_LENGTH),
+                ])
+
         run_command(
             executable,
-            [
-                "-i",
-                str(image_directory),
-                "-d",
-                str(sensor_width_database),
-                "-o",
-                str(output_directory),
-                "-c",
-                str(camera_model),
-            ],
+            args,
         )
 
     def compute_features(
@@ -121,7 +149,7 @@ class OpenMVG:
         sfm_data: Path,
         input_matches: Path,
         output_matches: Path,
-        geometric_model: str = "e",
+        geometric_model: str = GEOMETRIC_MODEL,
     ) -> None:
         """
         Removes geometrically inconsistent matches.

@@ -269,6 +269,12 @@ class ReconstructionPipeline:
             cuda_device=OPENMVS_CUDA_DEVICE,
         )
 
+        if not self.dense_point_cloud.exists():
+            raise RuntimeError(
+                "OpenMVS did not generate the dense point cloud. "
+                f"Expected output: {self.dense_point_cloud}"
+            )
+
         print("\n=== Dense reconstruction finished ===")
         print(f"Dense point cloud: {self.dense_point_cloud}")
 

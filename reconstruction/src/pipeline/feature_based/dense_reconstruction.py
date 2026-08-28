@@ -11,10 +11,15 @@ from src.core.point_cloud import PointCloud
 
 class DenseReconstructor:
     """
-    Reconstructs a dense 3D point cloud from a single image pair.
+    Experimental dense 3D reconstruction from a single image pair.
 
     The reconstruction uses stereo rectification followed by
     Semi-Global Block Matching (StereoSGBM).
+
+    This implementation is experimental and is currently
+    validated only on the Palm Desert dataset. Its camera
+    parameters, stereo configuration, and disparity convention
+    are therefore not yet generalized to other datasets.
 
     The relative camera pose follows the convention:
 
