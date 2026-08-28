@@ -12,9 +12,11 @@ from tests.modules_tests import prepare_test_pair, load_frames
 
 from src.config.camera_palm_desert import CAMERA_MATRIX
 
+# from src.config.camera_middlebury import CAMERA_MATRIX
+
 from src.config.paths import RECONSTRUCTION_OUTPUT
 
-def test_pairwise_reconstruction():
+def test_pairwise_reconstruction(frame_name_1: str | None=None, frame_name_2: str | None=None):
     """
     Tests the complete pairwise reconstruction pipeline.
 
@@ -31,9 +33,7 @@ def test_pairwise_reconstruction():
         Sparse Point Cloud
     """
 
-    # frame1, frame2, result = prepare_test_pair()
-
-    frame1, frame2, result = prepare_test_pair(frame_name1="view1.png", frame_name2="view5.png")
+    frame1, frame2, result = prepare_test_pair(frame_name1=frame_name_1, frame_name2=frame_name_2)
 
     triangulator = Triangulator()
 

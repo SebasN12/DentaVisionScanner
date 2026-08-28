@@ -37,7 +37,12 @@ def main():
 
     # pair.test_dense_reconstruction()
 
+    # Plastic tests
 
+    # pair.test_pairwise_reconstruction("view1.png", "view5.png")
+
+    
+    
     # Stereo
 
     # stereo.test_stereo_sgbm()
