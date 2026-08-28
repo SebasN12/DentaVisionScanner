@@ -12,7 +12,9 @@ from src.optimization.ba_problem import BAProblem
 from src.core.point_cloud import PointCloud
 
 
-from src.config.camera_palm_desert import CAMERA_MATRIX
+# from src.config.camera_palm_desert import CAMERA_MATRIX
+
+from src.config.camera_middlebury import CAMERA_MATRIX
 
 from src.config.paths import (
     DATASET_PATH,

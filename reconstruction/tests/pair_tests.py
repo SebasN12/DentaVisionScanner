@@ -10,9 +10,9 @@ from src.io.point_cloud_writer import PointCloudWriter
 from src.pipeline.feature_based.dense_reconstruction import DenseReconstructor
 from tests.modules_tests import prepare_test_pair, load_frames
 
-from src.config.camera_palm_desert import CAMERA_MATRIX
+# from src.config.camera_palm_desert import CAMERA_MATRIX
 
-# from src.config.camera_middlebury import CAMERA_MATRIX
+from src.config.camera_middlebury import CAMERA_MATRIX
 
 from src.config.paths import RECONSTRUCTION_OUTPUT
 

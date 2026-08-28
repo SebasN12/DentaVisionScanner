@@ -41,7 +41,7 @@ The exact PyTorch versions above are the versions tested with the current OpenSt
 
 ## Configuration
 
-Both `src/config` and `src_v2/config` contain different configurations that depend on the dataset to be used. Configurations for palm desert and middlebury are available, but commented. Remember to check the camera configuration, dataset path and in pair_tests.py there is an import that must be changed depending on the dataset being used.
+Both `src/config` and `src_v2/config` contain different configurations that depend on the dataset to be used. Configurations for palm desert and middlebury are available, but commented. Remember to check the camera configuration, dataset path, and in pair_tests.py and modules_tests.py, there is an import that must be changed depending on the dataset being used.
 
 Create a `.env` file in the reconstruction folder.
 
